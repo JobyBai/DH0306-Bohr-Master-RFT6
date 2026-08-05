@@ -27,6 +27,7 @@ uint8_t wlan_service_port[60] = { 0 }; // 服务端端口
 uint8_t wifi_state_t[2] = { 0, 1 };    // wifi状态 0-未连接 1-已连接
 uint8_t protocol_type[2] = { 0, 1 };   // TCP-1    UDP-0;
 uint8_t wifi_connect_state = 0;      // wifi连接状态 0未连接 1连接
+uint8_t wifi_transfer_cancel = 0; // 取消wifi传输, 1允许传输 2不允许传输
 
 // 蓝牙 相关参数
 uint8_t ble_state_t[2] = { 0, 1 }; // 蓝牙状态 0-未连接 1-已连接
@@ -286,7 +287,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				if (connect_type == 0x04) // wifi上传
 					{
 
-				
+					Wifi_Start_TX();
 					// check_wifi_connect_state(); // 检查wifi连接状态
 					// HAL_Delay(100);
 					// // 8(device_id) + 1(cmd) + 1(count) + index_mode1*8(数据)+ 1(wifi标志)

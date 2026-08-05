@@ -8,8 +8,8 @@
 #include "hmi_control.h"
 
 /* ───── DMA 环形缓冲区 ───── */
-static uint8_t dma_buf[SENSOR_DMA_BUF_SIZE];
-static uint16_t read_pos = 0; // 上次读取到的位置（读指针）
+static  uint8_t dma_buf[SENSOR_DMA_BUF_SIZE];
+static  uint16_t read_pos = 0; // 上次读取到的位置（读指针）
 
 /* ───── 对外数据 ───── */
 float period = 0.0f;      // 周期

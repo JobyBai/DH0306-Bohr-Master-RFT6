@@ -12,6 +12,7 @@
 #include "hmi_control.h"
 #include "ble_table_upload.h"
 #include "wifi_upload.h"
+#include "hmi_driver.h"
 
 
 typedef struct Y_QUEUE
@@ -239,13 +240,11 @@ void ESP32_232_data_tx(uint8_t *data,uint16_t len)
             if(data[2]==ble_name_set)memcpy(ble_name,&data[4],data[3]);
             if(data[2]==ble_mac_set)memcpy(ble_mac,&data[4],data[3]);
             if(data[2]==ble_paring_set)memcpy(ble_paring,&data[4],data[3]);
-            // 处理wifi上传指令
-            if(data[2]==wifi_upload){
-                // WifiUpload_Process(data, sizeof(data));
-            }
         }
         
-	}
+	}else if(data[len-1]==0x13){// 处理wifi上传指令
+         WifiUpload_Process(data, sizeof(data));
+   }
 }
 
 

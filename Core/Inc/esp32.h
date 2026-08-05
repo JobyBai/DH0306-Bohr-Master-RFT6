@@ -26,7 +26,6 @@ typedef enum
 	esp32_rs232,
 	esp32_ble,
 	esp32_wifi,
-	esp32_pc=0x20,
 }link_code_t;
 
 typedef enum
@@ -50,9 +49,6 @@ typedef enum
 	re232_check_bit=0xCC,
 
 	get_config_info = 0xBE,// 获取配置信息
-
-	// wifi上传指令
-	wifi_upload = 0x20,
 }cmd_code_t;
 
 

@@ -8,13 +8,21 @@
 #include "hmi_driver.h"
 
 
+/* ------------------------------------------------------------------ *
+ * 模块内部状态                                                          *
+ * ------------------------------------------------------------------ */
+static struct {
+    WifiUploadState_t state;         /* 上传状态 */
+    WifiUploadMode_t  mode;          /* 模式选择，用于区分不同类型的上传 */
+    uint16_t           current_row;   /* 当前行索引 */
+    uint8_t           retry_count;   /* 当前行重试次数 */
+    uint16_t           total_rows;    /* 总行数 */
+    uint8_t          buf[WIFI_UPLOAD_TX_BUF_SIZE]; /* 发送缓冲区 */
+    uint16_t         buf_len;       /* 发送缓冲区当前长度 */
+} s_tx;
 
-Record_t wifi_free_record_buf[200];// 用于wifi上传的自由振荡测量记录
-uint8_t wifi_free_len = 0;// 用于wifi上传的自由振荡测量记录索引
-Record_t wifi_damped_record_buf[200];// 用于wifi上传的阻尼振荡测量记录
-uint8_t wifi_damped_len = 0;// 用于wifi上传的阻尼振荡测量记录索引
-Record_t wifi_forced_record_buf[200];// 用于wifi上传的迫迫振荡测量记录
-uint8_t wifi_forced_len = 0;// 用于wifi上传的迫迫振荡测量记录索引
+Record_t wifi_upload_buf[200];// 用于wifi上传的记录
+uint8_t wifi_upload_len = 0;// 用于wifi上传的记录索引
 
 
 // wifi开始传输数据
@@ -53,11 +61,11 @@ static uint16_t build_payload(uint8_t *payload, uint16_t row_idx)
         // 写入分隔符（1字节）
         payload[pos++] = LF;
         // 写入幅值（4字节）
-        memcpy(&payload[pos], (uint8_t*) &wifi_free_record_buf[row_idx].amplitude,
+        memcpy(&payload[pos], (uint8_t*) &wifi_upload_buf[row_idx].amplitude,
 								sizeof(float));
 		pos += sizeof(float);
         // 写入周期（4字节）
-        memcpy(&payload[pos], (uint8_t*) &wifi_free_record_buf[row_idx].period,
+        memcpy(&payload[pos], (uint8_t*) &wifi_upload_buf[row_idx].period,
 								sizeof(float));
 		pos += sizeof(float);
 
@@ -86,7 +94,7 @@ static uint16_t build_payload(uint8_t *payload, uint16_t row_idx)
 static uint16_t build_frame(uint8_t *buf, uint16_t row_idx)
 {
     /* ── Step1: 构建数据载荷到 buf ────────────── */
-    uint8_t  *payload     = buf;
+    uint8_t  *payload     = buf + 4 ;
     uint16_t  payload_len = build_payload(payload, row_idx);
 
     /* ── Step2: 填写帧头 ──────────────────────────────────────────
@@ -139,9 +147,9 @@ void WifiUpload_Start(WifiUploadMode_t mode)
 
     if(mode == WIFI_MODE_FREE){//自由振荡
         for(int i = 0; i < index_mode1-1; i++){
-            wifi_free_record_buf[wifi_free_len++] = free_record_buf[i];
+            wifi_upload_buf[wifi_upload_len++] = free_record_buf[i];
         }
-        s_tx.total_rows = 4 + wifi_free_len; // 总行数
+        s_tx.total_rows = wifi_upload_len; // 总行数
     }
     // else if(mode == WIFI_MODE_DAMPED){//阻尼振荡
     //     // 筛选出对应阻尼档位的记录数
@@ -170,19 +178,19 @@ void WifiUpload_Start(WifiUploadMode_t mode)
 
 void WifiUpload_OnAck(uint8_t success)
 {
-    if (ble_transfer_cancel == 0) return;// 取消传输, 忽略响应
+    if (wifi_transfer_cancel == 0) return;// 取消传输, 忽略响应
     if (s_tx.state != WIFI_UPLOAD_SENDING) return;
 
     if (success)
     {
-        SetScreen(0x0009);// 展示正在蓝牙传输页面
+        SetScreen(0x0009);// 展示传输页面
         printf("WifiUpload: 第 %d 行发送成功\r\n", s_tx.current_row + 1);
         s_tx.retry_count = 0;
         s_tx.current_row++;
 
         if (s_tx.current_row >= s_tx.total_rows)
         {
-            ble_transfer_cancel = 0;// 上传完成, 重置取消标志
+            wifi_transfer_cancel = 0;// 上传完成, 重置取消标志
             SetScreen(current_screen);// 返回上传页面
             s_tx.state = WIFI_UPLOAD_DONE;
             printf("WifiUpload: 全部数据上传完成！\r\n");
@@ -222,7 +230,18 @@ void WifiUpload_OnAck(uint8_t success)
     uint8_t cmd = data[4];// 子功能码
     switch(cmd){
         case 0x01:// 启动上传
+             wifi_transfer_cancel = 1;// 允许传输, 重置取消标志
              WifiUpload_Start(WIFI_MODE_FREE);
+            break;
+        case 0x20:// 自由振荡上传返回
+            {
+                if(data[6] == 0x6F && data[7] == 0x6B){ // 成功
+                    WifiUpload_OnAck(1);
+                }
+                else{
+                    WifiUpload_OnAck(0);
+                }
+            }
             break;
         default:
             break;

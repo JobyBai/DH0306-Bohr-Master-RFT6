@@ -37,19 +37,6 @@ typedef enum {
 
 
 
-/* ------------------------------------------------------------------ *
- * 模块内部状态                                                          *
- * ------------------------------------------------------------------ */
-static struct {
-    WifiUploadState_t state;         /* 上传状态 */
-    WifiUploadMode_t  mode;          /* 模式选择，用于区分不同类型的上传 */
-    uint16_t           current_row;   /* 当前行索引 */
-    uint8_t           retry_count;   /* 当前行重试次数 */
-    uint16_t           total_rows;    /* 总行数 */
-    uint8_t          buf[WIFI_UPLOAD_TX_BUF_SIZE]; /* 发送缓冲区 */
-    uint16_t         buf_len;       /* 发送缓冲区当前长度 */
-} s_tx;
-
 
 void Wifi_Start_TX(void);
 void Wifi_End_TX(void);
