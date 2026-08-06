@@ -22,7 +22,7 @@ extern uint8_t wlan_service_port[60];
 extern uint8_t wifi_state_t[2];
 extern uint8_t protocol_type[2]; //TCP-1    UDP-0;
 extern uint8_t wifi_connect_state;// wifi连接状态 0未连接 1连接
-extern uint8_t wifi_transfer_cancel;// 取消wifi传输, 1允许传输 2不允许传输
+extern uint8_t wifi_transfer_type;// wifi传输类型, 0不允许传输 1自由振荡上传 2阻尼振荡上传 3受迫振荡上传
 
 // 蓝牙参数
 extern uint8_t ble_name[60];

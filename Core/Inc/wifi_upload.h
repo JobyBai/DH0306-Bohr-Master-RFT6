@@ -30,9 +30,10 @@ typedef enum {
 } WifiUploadState_t;
 
 typedef enum {
-    WIFI_MODE_FREE   = 0,   /* 自由振荡数据   free_record_buf   */
-    WIFI_MODE_DAMPED = 1,   /* 阻尼振荡数据   damped_record_buf */
-    WIFI_MODE_FORCED = 2,   /* 受迫振荡数据   forced_record_buf */
+    WIFI_MODE_INVALID = 0,   /* 无效模式        */
+    WIFI_MODE_FREE   = 1,   /* 自由振荡数据   free_record_buf   */
+    WIFI_MODE_DAMPED = 2,   /* 阻尼振荡数据   damped_record_buf */
+    WIFI_MODE_FORCED = 3,   /* 受迫振荡数据   forced_record_buf */
 } WifiUploadMode_t;
 
 

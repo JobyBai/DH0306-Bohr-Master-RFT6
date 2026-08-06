@@ -70,14 +70,114 @@ static uint16_t build_payload(uint8_t *payload, uint16_t row_idx)
 		pos += sizeof(float);
 
     }
-    // else if(s_tx.mode == WIFI_MODE_DAMPED)
-    // {
-    //     pos = build_damped_record(payload);
-    // }
-    // else if(s_tx.mode == WIFI_MODE_FORCED)
-    // {
-    //     pos = build_forced_record(payload);
-    // }
+    else if(s_tx.mode == WIFI_MODE_DAMPED)
+    {
+        uint16_t damping_val;
+        char damping_str[6];   // 最多支持5位数字+结束符
+        int damping_len;
+          // 写入功能码（1字节）
+        payload[pos++] = 0x21;
+        // 写入 device_id（8字节）
+        memcpy(&payload[pos], device_id, sizeof(device_id));
+        pos += sizeof(device_id);
+        // 写入分隔符（1字节）
+        payload[pos++] = LF;
+        // 写入数据类型（1字节）
+        payload[pos++] = 0x02;
+        // 写入分隔符（1字节）
+        payload[pos++] = LF;
+        // 写入阻尼档位（ASCII，仅适用于 damping_num 为个位数的情况）
+        payload[pos++] = damping_num + '0';
+        // 写入分隔符（1字节）
+        payload[pos++] = LF;
+        // 根据阻尼档位选择对应阻尼值
+        switch (damping_num)
+        {
+            case 1: damping_val = damping1; break;
+            case 2: damping_val = damping2; break;
+            case 3: damping_val = damping3; break;
+            default: damping_val = 0; break;
+        }
+        // 阻尼值转ASCII字符串并写入
+        damping_len = sprintf(damping_str, "%u", damping_val);
+        memcpy(&payload[pos], damping_str, damping_len);
+        pos += damping_len;
+        // 写入分隔符（1字节）
+        payload[pos++] = LF;
+        // 写入幅值（4字节）
+        memcpy(&payload[pos], (uint8_t*) &wifi_upload_buf[row_idx].amplitude,
+								sizeof(float));
+		pos += sizeof(float);
+        // 写入周期（4字节）
+        memcpy(&payload[pos], (uint8_t*) &wifi_upload_buf[row_idx].period,
+								sizeof(float));
+		pos += sizeof(float);
+    }
+    else if(s_tx.mode == WIFI_MODE_FORCED)
+    {
+        uint16_t damping_val;
+        char damping_str[6];   // 最多支持5位数字+结束符
+        int damping_len;
+        float period_x10;
+          // 写入功能码（1字节）
+        payload[pos++] = 0x21;
+        // 写入 device_id（8字节）
+        memcpy(&payload[pos], device_id, sizeof(device_id));
+        pos += sizeof(device_id);
+        // 写入分隔符（1字节）
+        payload[pos++] = LF;
+        // 写入数据类型（1字节）
+        payload[pos++] = 0x02;
+        // 写入分隔符（1字节）
+        payload[pos++] = LF;
+        // 写入阻尼档位（ASCII，仅适用于 damping_num 为个位数的情况）
+        payload[pos++] = filter_damping_num + '0';
+        // 写入分隔符（1字节）
+        payload[pos++] = LF;
+        // 根据阻尼档位选择对应阻尼值 
+        switch (filter_damping_num)
+        {
+            case 1: damping_val = damping1; break;
+            case 2: damping_val = damping2; break;
+            case 3: damping_val = damping3; break;
+            default: damping_val = 0; break;
+        }
+        // 阻尼值转ASCII字符串并写入
+        damping_len = sprintf(damping_str, "%u", damping_val);
+        memcpy(&payload[pos], damping_str, damping_len);
+        pos += damping_len;
+        // 写入分隔符（1字节）
+        payload[pos++] = LF;
+        // 写入10倍周期（4字节，float）—— 假设为 period*10，如有出入请指正
+        period_x10 = wifi_upload_buf[row_idx].period * 10.0f;
+        memcpy(&payload[pos], (uint8_t*) &period_x10, sizeof(float));
+        pos += sizeof(float);
+
+        // 写入摆轮周期（4字节）
+        memcpy(&payload[pos], (uint8_t*) &wifi_upload_buf[row_idx].period,
+                                sizeof(float));
+        pos += sizeof(float);
+
+        // 写入驱动周期（4字节）
+        memcpy(&payload[pos], (uint8_t*) &wifi_upload_buf[row_idx].drive_period,
+                                sizeof(float));
+        pos += sizeof(float);
+
+        // 写入振幅（4字节）
+        memcpy(&payload[pos], (uint8_t*) &wifi_upload_buf[row_idx].amplitude,
+                                sizeof(float));
+        pos += sizeof(float);
+
+        // 写入相位差1（4字节）
+        memcpy(&payload[pos], (uint8_t*) &wifi_upload_buf[row_idx].phase_diff1,
+                                sizeof(float));
+        pos += sizeof(float);
+
+        // 写入相位差2（4字节）
+        memcpy(&payload[pos], (uint8_t*) &wifi_upload_buf[row_idx].phase_diff2,
+                                sizeof(float));
+        pos += sizeof(float);
+    }
     return pos;
 }
 
@@ -151,23 +251,23 @@ void WifiUpload_Start(WifiUploadMode_t mode)
         }
         s_tx.total_rows = wifi_upload_len; // 总行数
     }
-    // else if(mode == WIFI_MODE_DAMPED){//阻尼振荡
-    //     // 筛选出对应阻尼档位的记录数
-    //     for(int i = 0; i < index_mode2-1; i++){
-    //        if(damped_record_buf[i].damping == damping_num){
-    //            ble_damped_record_buf[ble_damped_len++] = damped_record_buf[i];
-    //        }
-    //     }
-    //     s_tx.total_rows = 4 + wifi_damped_len; // 总行数
-    // }else if(mode == WIFI_MODE_FORCED){// 受迫振荡
-    //      // 筛选出对应迫档位的记录数
-    //     for(int i = 0; i < index_mode3-1; i++){
-    //        if(forced_record_buf[i].damping == filter_damping_num){
-    //            ble_forced_record_buf[ble_forced_len++] = forced_record_buf[i];
-    //        }
-    //     }
-    //     s_tx.total_rows = 4 + ble_forced_len; // 总行数
-    // }
+    else if(mode == WIFI_MODE_DAMPED){//阻尼振荡
+        // 筛选出对应阻尼档位的记录数
+        for(int i = 0; i < index_mode2-1; i++){
+           if(damped_record_buf[i].damping == damping_num){
+               wifi_upload_buf[wifi_upload_len++] = damped_record_buf[i];
+           }
+        }
+        s_tx.total_rows = wifi_upload_len; // 总行数
+    }else if(mode == WIFI_MODE_FORCED){// 受迫振荡
+         // 筛选出对应迫档位的记录数
+        for(int i = 0; i < index_mode3-1; i++){
+           if(forced_record_buf[i].damping == filter_damping_num){
+               wifi_upload_buf[wifi_upload_len++] = forced_record_buf[i];
+           }
+        }
+        s_tx.total_rows = wifi_upload_len; // 总行数
+    }
 
     printf("WifiUpload: 开始上传 [%d]，共 %d 行\r\n",
            mode, s_tx.total_rows);
@@ -178,7 +278,7 @@ void WifiUpload_Start(WifiUploadMode_t mode)
 
 void WifiUpload_OnAck(uint8_t success)
 {
-    if (wifi_transfer_cancel == 0) return;// 取消传输, 忽略响应
+    if (wifi_transfer_type == 0) return;// 取消传输, 忽略响应
     if (s_tx.state != WIFI_UPLOAD_SENDING) return;
 
     if (success)
@@ -190,7 +290,7 @@ void WifiUpload_OnAck(uint8_t success)
 
         if (s_tx.current_row >= s_tx.total_rows)
         {
-            wifi_transfer_cancel = 0;// 上传完成, 重置取消标志
+            wifi_transfer_type = 0;// 上传完成, 重置取消标志
             SetScreen(current_screen);// 返回上传页面
             s_tx.state = WIFI_UPLOAD_DONE;
             printf("WifiUpload: 全部数据上传完成！\r\n");
@@ -230,8 +330,7 @@ void WifiUpload_OnAck(uint8_t success)
     uint8_t cmd = data[4];// 子功能码
     switch(cmd){
         case 0x01:// 启动上传
-             wifi_transfer_cancel = 1;// 允许传输, 重置取消标志
-             WifiUpload_Start(WIFI_MODE_FREE);
+             WifiUpload_Start(wifi_transfer_type);
             break;
         case 0x20:// 自由振荡上传返回
             {
@@ -243,6 +342,26 @@ void WifiUpload_OnAck(uint8_t success)
                 }
             }
             break;
+        case 0x21:// 阻尼振荡上传返回
+            {
+                if(data[6] == 0x6F && data[7] == 0x6B){ // 成功
+                    WifiUpload_OnAck(1);
+                }
+                else{
+                    WifiUpload_OnAck(0);
+                }
+            }
+            break;
+        case 0x22:// 受迫振荡上传返回
+            {
+                if(data[6] == 0x6F && data[7] == 0x6B){ // 成功
+                    WifiUpload_OnAck(1);
+                }
+                else{
+                    WifiUpload_OnAck(0);
+                }
+            }
+            break;    
         default:
             break;
     }
