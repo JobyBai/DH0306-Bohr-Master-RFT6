@@ -203,14 +203,6 @@ void stm32_to_esp32_data(cmd_code_t cmd_code,uint8_t *p,uint16_t len,link_code_t
 	}
 }
 
-/*!
-*  \brief  检查wifi是否正常连接
-*/
-void check_wifi_connect_state(void)
-{
-     uint8_t wifi_connect_state_resp[1] = {0x01};
-	 stm32_to_esp32_data(wifi_connect_state_set, wifi_connect_state_resp, 1, esp32_stm32);
-}
 
 /*!
  * 
@@ -230,12 +222,8 @@ void ESP32_232_data_tx(uint8_t *data,uint16_t len)
         	if(data[2]==wifi_service_IP_set)memcpy(wlan_service_IP,&data[4],data[3]);
         	if(data[2]==wifi_service_port_set)memcpy(wlan_service_port,&data[4],data[3]);
         	if(data[2]==wifi_state)wifi_state_flag=1;
-             if(data[2]==wifi_connect_state_set){
+            if(data[2]==wifi_connect_state_set){// 获取wifi连接状态
                 wifi_connect_state = data[4];				
-                if(wifi_connect_state == 0)
-                {
-                    SetScreen(0x0008);
-                }
              }
             if(data[2]==ble_name_set)memcpy(ble_name,&data[4],data[3]);
             if(data[2]==ble_mac_set)memcpy(ble_mac,&data[4],data[3]);

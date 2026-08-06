@@ -36,7 +36,7 @@ typedef enum
 	wifi_password_set=0xEC,
 	wifi_service_IP_set=0xEB,
 	wifi_service_port_set=0xEA,
-	wifi_connect_state_set=0xE9,//0:未连接，1:已连接
+	wifi_connect_state_set=0xE0,// wifi连接状态
 
 	ble_state=0xDF,
 	ble_name_set=0xDD,
@@ -62,6 +62,5 @@ void ESP32_232_communication_task_callback(void);
 void y_queue_push(y_qdata y_data);
 void y_queue_reset(void);
 uint8_t sum_low_8bits(uint8_t *numbers, uint16_t count);
-void check_wifi_connect_state(void);
 
 #endif /* INC_ESP32_H_ */

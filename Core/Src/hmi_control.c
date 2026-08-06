@@ -27,7 +27,7 @@ uint8_t wlan_service_IP[60] = { 0 };   // 服务端IP
 uint8_t wlan_service_port[60] = { 0 }; // 服务端端口
 uint8_t wifi_state_t[2] = { 0, 1 };    // wifi状态 0-未连接 1-已连接
 uint8_t protocol_type[2] = { 0, 1 };   // TCP-1    UDP-0;
-uint8_t wifi_connect_state = 0;      // wifi连接状态 0未连接 1连接
+uint8_t wifi_connect_state = 0;      // wifi连接状态 0:禁用 ，1:打开未连接， 2：连接成功 3：连接中
 uint8_t wifi_transfer_type = 0; // wifi传输类型, 0不允许传输 1自由振荡上传 2阻尼振荡上传 3受迫振荡上传
 
 // 蓝牙 相关参数
@@ -280,37 +280,16 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 
 		case 0x05: // 上传
 			if (state == 0x01) {
-				// if (index_mode1 == 0) return; // 无数据时不发送
 				current_screen = 0x0001;
-				// if (index_mode1 > 201)
-				// 	return; // 防止越界, wifi传输最大数据量为200字节, 18字节为wifi标志,
-				// 			// 100字节为数据, 18字节为count
 				if (connect_type == 0x04) // wifi上传
+				{
+					if(wifi_connect_state != 2) // 未连接wifi
 					{
+						SetScreen(0x0008);
+						return;
+					}
 					wifi_transfer_type = 1;	
 					Wifi_Start_TX();
-					// check_wifi_connect_state(); // 检查wifi连接状态
-					// HAL_Delay(100);
-					// // 8(device_id) + 1(cmd) + 1(count) + index_mode1*8(数据)+ 1(wifi标志)
-					// uint8_t ack_data[8 + 1 + 1 + (index_mode1 - 1) * 8 + 1];
-
-					// memcpy(ack_data, device_id, sizeof(device_id)); // [0~7] device_id
-					// ack_data[8] = 0x59;            // [8]   cmd  自由振荡测量
-					// ack_data[9] = index_mode1 - 1; // [9]   count（含+1偏移）
-
-					// uint8_t *ptr = ack_data + 10;
-					// for (int i = 0; i < index_mode1 - 1; i++) {
-					// 	memcpy(ptr, (uint8_t*) &free_record_buf[i].amplitude,
-					// 			sizeof(float));
-					// 	ptr += sizeof(float);
-					// 	memcpy(ptr, (uint8_t*) &free_record_buf[i].period,
-					// 			sizeof(float));
-					// 	ptr += sizeof(float);
-					// }
-
-					// ack_data[sizeof(ack_data) - 1] = 0x13; // wifi传输标志
-
-					// ESP32_ack_data(ack_data, sizeof(ack_data));
 				} else if (connect_type == 0x07) // 蓝牙上传
 						{
 					ble_transfer_cancel = 1;
@@ -386,60 +365,13 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 
 				if (connect_type == 0x04) // wifi上传
 					{
+					if(wifi_connect_state != 2) // 未连接wifi
+					{
+						SetScreen(0x0008);
+						return;
+					}
 					wifi_transfer_type = 2;	
 					Wifi_Start_TX();
-					// check_wifi_connect_state(); // 检查wifi连接状态
-					// HAL_Delay(100);
-					// // 按阻尼档位筛选
-					// uint8_t count1 = 0, count2 = 0, count3 = 0;
-					// for (int i = 0; i < index_mode2 - 1; i++) {
-					// 	switch (damped_record_buf[i].damping) {
-					// 	case 1:
-					// 		count1++;
-					// 		break;
-					// 	case 2:
-					// 		count2++;
-					// 		break;
-					// 	case 3:
-					// 		count3++;
-					// 		break;
-					// 	default:
-					// 		break; // 非1/2/3档位，过滤掉
-					// 	}
-					// }
-
-					// // 8(device_id) + 1(cmd) + 1(阻尼1count) + 1(阻尼2count) +
-					// // 1(阻尼3count) + count1*8 + count2*8 + count3*8 + 1(wifi标志)
-					// uint8_t ack_data[8 + 1 + 1 + 1 + 1 + count1 * 8 + count2 * 8
-					// 		+ count3 * 8 + 1];
-
-					// memcpy(ack_data, device_id, sizeof(device_id)); // [0~7] device_id
-					// ack_data[8] = 0x5A;    // [8]  cmd 阻尼振荡测量
-					// ack_data[9] = count1;  // [9]  阻尼1 count
-					// ack_data[10] = count2; // [10] 阻尼2 count
-					// ack_data[11] = count3; // [11] 阻尼3 count
-
-					// uint8_t *ptr = ack_data + 12;
-
-					// // 分三轮按档位写入数据
-					// for (uint8_t damping_level = 1; damping_level <= 3;
-					// 		damping_level++) {
-					// 	for (int i = 0; i < index_mode2 - 1; i++) {
-					// 		if (damped_record_buf[i].damping != damping_level)
-					// 			continue;
-
-					// 		memcpy(ptr,
-					// 				(uint8_t*) &damped_record_buf[i].amplitude,
-					// 				sizeof(float));
-					// 		ptr += sizeof(float);
-					// 		memcpy(ptr, (uint8_t*) &damped_record_buf[i].period,
-					// 				sizeof(float));
-					// 		ptr += sizeof(float);
-					// 	}
-					// }
-					// ack_data[sizeof(ack_data) - 1] = 0x13; // wifi传输标志
-
-					// ESP32_ack_data(ack_data, sizeof(ack_data));
 				} else if (connect_type == 0x07) // 蓝牙上传
 						{
 					ble_transfer_cancel = 1;
@@ -640,58 +572,13 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 						SetScreen(0x000C);
 						return;
 					}
+					if(wifi_connect_state != 2) // 未连接wifi
+					{
+						SetScreen(0x0008);
+						return;
+					}
 					wifi_transfer_type = 3;	
 					Wifi_Start_TX();
-					// check_wifi_connect_state();
-					// HAL_Delay(100);
-
-					// // 第一遍：统计符合所选阻尼档位的记录数
-					// uint16_t match_count = 0;
-					// for (int i = 0; i <= count; i++) {
-					// 	if (forced_record_buf[i].damping == filter_damping_num) {
-					// 		match_count++;
-					// 	}
-					// }
-
-					// // 数组大小按筛选后的实际条数 match_count 计算
-					// uint8_t ack_data[8 + 1 + 1 + 1 + match_count * 6 * 4 + 1];
-
-					// memcpy(ack_data, device_id, sizeof(device_id));
-					// ack_data[8] = 0x51;
-					// ack_data[9] = match_count; // count字段改为筛选后的实际条数
-					// ack_data[10] = filter_damping_num; // 受迫表格档位选择字段
-					// uint8_t *ptr = ack_data + 11;
-
-					// // 第二遍：只写入符合所选阻尼档位的记录
-					// for (int i = 0; i <= count; i++) {
-					// 	if (forced_record_buf[i].damping != filter_damping_num) {
-					// 		continue;
-					// 	}
-					// 	float period_x10 = forced_record_buf[i].period * 10.0f;
-					// 	memcpy(ptr, (uint8_t*) &period_x10, sizeof(float));
-					// 	ptr += sizeof(float);
-					// 	memcpy(ptr, (uint8_t*) &forced_record_buf[i].period,
-					// 			sizeof(float));
-					// 	ptr += sizeof(float);
-					// 	memcpy(ptr,
-					// 			(uint8_t*) &forced_record_buf[i].drive_period,
-					// 			sizeof(float));
-					// 	ptr += sizeof(float);
-					// 	memcpy(ptr, (uint8_t*) &forced_record_buf[i].amplitude,
-					// 			sizeof(float));
-					// 	ptr += sizeof(float);
-					// 	memcpy(ptr,
-					// 			(uint8_t*) &forced_record_buf[i].phase_diff1,
-					// 			sizeof(float));
-					// 	ptr += sizeof(float);
-					// 	memcpy(ptr,
-					// 			(uint8_t*) &forced_record_buf[i].phase_diff2,
-					// 			sizeof(float));
-					// 	ptr += sizeof(float);
-					// }
-					// ack_data[sizeof(ack_data) - 1] = 0x13;
-					// ESP32_ack_data(ack_data, sizeof(ack_data));
-
 				} else if (connect_type == 0x07) {//蓝牙上传
 					ble_transfer_cancel = 1;
 					BleUpload_Start(BLE_MODE_FORCED);
