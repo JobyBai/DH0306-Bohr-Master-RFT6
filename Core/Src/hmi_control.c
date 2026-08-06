@@ -1055,6 +1055,10 @@ void touch_hmi_task_callback(void) {
 		hmi_updata_flag = 0;
 		UpdateUI();
 	}
+	if (wifi_signal_updata_flag) {
+		wifi_signal_updata_flag = 0;
+		Get_Wifi_Signal_Strength();
+	}
 }
 
 /*!

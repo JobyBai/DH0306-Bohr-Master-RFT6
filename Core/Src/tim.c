@@ -108,18 +108,22 @@ void HAL_TIM_Base_MspDeInit(TIM_HandleTypeDef* tim_baseHandle)
 
 /* USER CODE BEGIN 1 */
 uint8_t hmi_updata_flag = 0;
-_Bool update_flag = 0;
 #define ui_cnt 100
 uint16_t ui_timer_tick = ui_cnt;
+#define ui_cnt_1s  1000
+uint16_t ui_timer_1s = ui_cnt_1s;
+uint8_t wifi_signal_updata_flag = 0;
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM4) {
 		if (ui_timer_tick-- == 0) {
-			update_flag = 1;
 			hmi_updata_flag = 1;
 			ui_timer_tick = ui_cnt;
-
+		}
+		if (ui_timer_1s-- == 0) {
+      wifi_signal_updata_flag = 1;
+			ui_timer_1s = ui_cnt_1s;
 		}
 	}
 }

@@ -205,6 +205,27 @@ void stm32_to_esp32_data(cmd_code_t cmd_code,uint8_t *p,uint16_t len,link_code_t
 
 
 /*!
+*  \brief  获取wifi信号强弱等级
+*  \param  rssi  wifi信号强度
+*  \return  wifi信号强弱等级
+*/
+static WifiSignalLevel_t Wifi_GetSignalLevel(int8_t rssi)
+{
+    if (rssi >= -70)
+    {
+        return WIFI_SIGNAL_STRONG;
+    }
+    else if (rssi >= -85)
+    {
+        return WIFI_SIGNAL_MEDIUM;
+    }
+    else
+    {
+        return WIFI_SIGNAL_WEAK;
+    }
+}
+
+/*!
  * 
 *  \brief  处理ESP32发来的指令
 *  \return  无
@@ -225,6 +246,30 @@ void ESP32_232_data_tx(uint8_t *data,uint16_t len)
             if(data[2]==wifi_connect_state_set){// 获取wifi连接状态
                 wifi_connect_state = data[4];				
              }
+            if(data[2]==wifi_signal_strength_set){// 获取wifi信号强弱
+                wifi_connect_state = data[4];	
+                if (data[4] == 2) // 连接状态下处理信号强弱
+                {
+                    int8_t wifi_signal_strength = data[5];
+                    WifiSignalLevel_t signal_level = Wifi_GetSignalLevel(wifi_signal_strength);
+
+                    switch (signal_level)
+                    {
+                        case WIFI_SIGNAL_STRONG:
+                            // 显示满格图标
+                            AnimationPlayFrame(0, 0x07, 1);
+                            break;
+                        case WIFI_SIGNAL_MEDIUM:
+                            // 显示中等图标
+                            AnimationPlayFrame(0, 0x07, 4);
+                            break;
+                        case WIFI_SIGNAL_WEAK:
+                            // 显示弱信号图标
+                            AnimationPlayFrame(0, 0x07, 5);
+                            break;
+                    }
+                }
+            }
             if(data[2]==ble_name_set)memcpy(ble_name,&data[4],data[3]);
             if(data[2]==ble_mac_set)memcpy(ble_mac,&data[4],data[3]);
             if(data[2]==ble_paring_set)memcpy(ble_paring,&data[4],data[3]);
@@ -269,6 +314,17 @@ uint8_t ble_msg_receive_ERROR[]={0x65,0x72,0x72,0x6F,0x72,0x0D,0x0A,0x12};//蓝�
 
  }
 
+
+
+
+/*!
+*  \brief  查询wifi信号强弱
+*/
+void Get_Wifi_Signal_Strength(void)
+{
+     uint8_t wifi_signal_strength_resp[1] = {0x00};
+	 stm32_to_esp32_data(wifi_signal_strength_set, wifi_signal_strength_resp, 1, esp32_stm32);
+}
 
 
 

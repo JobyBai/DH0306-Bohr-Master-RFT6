@@ -37,6 +37,7 @@ typedef enum
 	wifi_service_IP_set=0xEB,
 	wifi_service_port_set=0xEA,
 	wifi_connect_state_set=0xE0,// wifi连接状态
+	wifi_signal_strength_set=0xE8,// 信号强度
 
 	ble_state=0xDF,
 	ble_name_set=0xDD,
@@ -52,6 +53,14 @@ typedef enum
 }cmd_code_t;
 
 
+typedef enum
+{
+    WIFI_SIGNAL_WEAK = 0,   // 弱：低于 -85dBm
+    WIFI_SIGNAL_MEDIUM,     // 中：-85 ~ -70dBm
+    WIFI_SIGNAL_STRONG      // 强：-70dBm 以上
+} WifiSignalLevel_t;
+
+
 extern uint8_t ble_state_flag;
 extern uint8_t wifi_state_flag;
 
@@ -62,5 +71,6 @@ void ESP32_232_communication_task_callback(void);
 void y_queue_push(y_qdata y_data);
 void y_queue_reset(void);
 uint8_t sum_low_8bits(uint8_t *numbers, uint16_t count);
+void Get_Wifi_Signal_Strength(void);
 
 #endif /* INC_ESP32_H_ */
