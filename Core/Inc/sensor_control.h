@@ -35,6 +35,10 @@
 /* ───── DMA 环形缓冲区 ───── */
 #define SENSOR_DMA_BUF_SIZE     256     // 必须是2的幂，方便取模
 
+#define     CAN_ID_MASTER            0x00A       // 主机id
+#define     CAN_ID_SLAVE             0x00B       // 从机id
+
+
 /* ───── 对外数据（按需暴露） ───── */
 extern _Bool sensor_receive_flag;
 extern uint8_t sensor_data[20];
@@ -78,5 +82,10 @@ void Sensor_Control_Start_Mode1(void);
 void Sensor_Control_Start_Mode2(void);
 // void Sensor_Receive(void);
 void Sensor_Poll(void);
+void Control_Init(void);
+void Control_CanRxCallback(uint32_t ID, uint8_t *buf, uint8_t len);
+void Can_Send(void);
+
+
 
 #endif /* __SENSOR_CONTROL_H__ */

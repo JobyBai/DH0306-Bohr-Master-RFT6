@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "can.h"
 #include "dma.h"
 #include "spi.h"
 #include "tim.h"
@@ -32,6 +33,7 @@
 #include "sensor_control.h"
 #include "esp32.h"
 #include "power_control.h"
+#include "drv_can.h"
 
 /* USER CODE END Includes */
 
@@ -99,13 +101,14 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_SPI1_Init();
-  MX_UART4_Init();
   MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
+  MX_SPI1_Init();
   MX_SPI2_Init();
+  MX_UART4_Init();
   MX_TIM4_Init();
+  MX_CAN_Init();
   /* USER CODE BEGIN 2 */
 	// 初始化 SFUD 设备
 	printf("\r\n====== SFUD 初始化 ======\r\n");
@@ -114,7 +117,7 @@ int main(void)
 	if (sfud_result != SFUD_SUCCESS) {
 		printf("[FAIL] sfud_init 失败，错误码: %d\r\n", sfud_result);
 		printf("  → 检查 sfud_port.c 的 SPI 读写函数和 CS 引脚1\r\n");
-		return;
+		return 0;
 	}
 	printf("[PASS] sfud_init 成功\r\n");
 
@@ -123,7 +126,7 @@ int main(void)
 	if (g_flash == NULL) {
 		printf("[FAIL] 获取 Flash 设备失败\r\n");
 		printf("  → 检查 sfud_cfg.h 的 SFUD_FLASH_DEVICE_TABLE 配置\r\n");
-		return;
+		return 0;
 	}
 	printf("[PASS] 获取设备成功: %s\r\n", g_flash->name);
 	printf("       容量: %lu KB\r\n", g_flash->chip.capacity / 1024);
@@ -142,7 +145,13 @@ int main(void)
   HAL_UART_Transmit(&huart4, motor_cycle_msg, 6, 100);
 
   // 获取配置信息
-//   GetConfigInfo();
+  //   GetConfigInfo();
+  // CAN通讯
+// DRV_CAN_InitFilterList16(0x00A << 5, 0x00A << 5, 0x00A << 5, 0x00A << 5);
+  DRV_CAN_InitFilterMask16(0x00, 0x00, 0x00, 0x00);
+  DRV_CAN_Start(); // 开始CAN传输
+  Control_Init(); // 初始化CAN接收处理回调函数
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -153,6 +162,8 @@ int main(void)
 	Sensor_Poll();// spi 接收数据
 	power_communication_task_callback();// 处理电源板从机指令
 	FilterByDampedNum(damping_num);
+	DRV_CAN_ProcessData();
+	Can_Send();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

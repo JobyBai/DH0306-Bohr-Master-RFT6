@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "hmi_control.h"
+#include "drv_can.h"
 
 /* ───── DMA 环形缓冲区 ───── */
 static  uint8_t dma_buf[SENSOR_DMA_BUF_SIZE];
@@ -201,4 +202,67 @@ void Sensor_Poll(void) {
   }
 }
 
+void Control_Init(void) {
+	DRV_RegisterCanRxCallback(Control_CanRxCallback); // 注册CAN接收处理回调函数
+}
 
+
+// CAN接收处理回调函数
+void Control_CanRxCallback(uint32_t ID, uint8_t *buf, uint8_t len) {
+	if (ID != CAN_ID_SLAVE)
+		return;
+	uint8_t function = buf[1];  // 功能码
+
+	// uint8_t can_msg[8];
+	switch (function) {
+	case 0x20: // 从机应答
+//		DRV_CAN_SendData(CAN_ID_SLAVE, CAN_SLAVE_ANSWER, 8);
+		break;
+	case 0x21: // 获取振幅
+		// // 请求当前位置信息
+		uint8_t msg[8] = { 0x01, 0x03, 0x10, 0x39, 0x00, 0x04, 0x90, 0xC4 }; // 位置
+		// HAL_UART_Transmit(&huart2, msg, sizeof(msg), 50);
+		// current_req = MODBUS_REQ_LOCATION;
+		break;
+  case 0x22: // 获取周期
+    break;
+  case 0x23: // 获取相位差1
+    break;
+  case 0x24: // 获取相位差2
+    break;
+  default:
+    break;
+    }
+}
+
+
+// CAN发送
+uint8_t CAN_SLAVE_ANSWER[8] = { 0x00, 0x20 }; // 从机应答指令
+uint8_t CAN_SLAVE_ANSWER_AMPLITUDE[8] = { 0x00, 0x21 }; // 获取振幅应答
+uint8_t CAN_SLAVE_ANSWER_PERIOD[8] = { 0x00, 0x22 }; // 获取周期应答
+uint8_t CAN_SLAVE_ANSWER_PHASE_DIFF_1[8] = { 0x00, 0x23 }; // 获取相位差1应答
+uint8_t CAN_SLAVE_ANSWER_PHASE_DIFF_2[8] = { 0x00, 0x24 }; // 获取相位差2应答
+
+/**
+ * @brief 发送CAN数据
+ * 
+ */
+void Can_Send(void) {
+  if (can_send_flag == 1) {
+    DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER, 8);
+    return;
+  }else if (can_send_flag == 2) {
+    DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_AMPLITUDE, 8);
+    return;
+  }else if (can_send_flag == 3) {
+    DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_PERIOD, 8);
+    return;
+  }else if (can_send_flag == 4) {
+    DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_PHASE_DIFF_1, 8);
+    return;
+  }else if (can_send_flag == 5) {
+    can_send_flag = 0;
+    DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_PHASE_DIFF_2, 8);
+    return;
+  }
+}
