@@ -290,7 +290,7 @@ void WifiUpload_OnAck(uint8_t success)
 
         if (s_tx.current_row >= s_tx.total_rows)
         {
-            wifi_transfer_type = 0;// 上传完成, 重置取消标志
+            WifiUpload_ChannelClose();// 上传完成, 关闭通道
             SetScreen(current_screen);// 返回上传页面
             s_tx.state = WIFI_UPLOAD_DONE;
             printf("WifiUpload: 全部数据上传完成！\r\n");
@@ -365,4 +365,14 @@ void WifiUpload_OnAck(uint8_t success)
         default:
             break;
     }
+}
+
+
+// 传输通道关闭
+void WifiUpload_ChannelClose(void)
+{
+    wifi_transfer_type = 0;// 上传完成, 重置取消标志
+    s_tx.state = WIFI_UPLOAD_DONE; // 上传完成, 重置状态
+    wifi_upload_len = 0;// 上传完成, 重置上传长度
+    memset(wifi_upload_buf, 0, sizeof(wifi_upload_buf));// 上传完成, 重置上传缓冲区
 }

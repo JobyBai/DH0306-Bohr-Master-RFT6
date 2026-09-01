@@ -114,9 +114,6 @@ uint16_t ui_timer_tick = ui_cnt;
 #define ui_cnt_1s  1000
 uint16_t ui_timer_1s = ui_cnt_1s;
 uint8_t wifi_signal_updata_flag = 0;
-uint8_t can_send_flag = 0;
-#define can_cnt 20
-uint16_t can_timer_tick = can_cnt;
 
 
 
@@ -130,10 +127,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 		if (ui_timer_1s-- == 0) {
       wifi_signal_updata_flag = 1;
 			ui_timer_1s = ui_cnt_1s;
-		}
-    if (can_timer_tick-- == 0) {
-      can_send_flag++;
-			can_timer_tick = can_cnt;
 		}
 	}
 }

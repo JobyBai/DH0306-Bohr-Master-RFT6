@@ -37,7 +37,6 @@ extern TIM_HandleTypeDef htim4;
 /* USER CODE BEGIN Private defines */
 extern uint8_t hmi_updata_flag;
 extern uint8_t wifi_signal_updata_flag;
-extern uint8_t can_send_flag;
 /* USER CODE END Private defines */
 
 void MX_TIM4_Init(void);

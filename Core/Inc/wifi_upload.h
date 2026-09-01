@@ -43,5 +43,6 @@ void Wifi_Start_TX(void);
 void Wifi_End_TX(void);
 void WifiUpload_Start(WifiUploadMode_t mode);
 void WifiUpload_Process(uint8_t *data, uint8_t len);
+void WifiUpload_ChannelClose(void);
 
 #endif

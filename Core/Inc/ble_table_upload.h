@@ -52,5 +52,6 @@ void BleUpload_OnAck(uint8_t success);
  * @brief  查询当前上传状态
  */
 BleUploadState_t BleUpload_GetState(void);
+void BleUpload_ChannelClose(void);
 
 #endif /* BLE_TABLE_UPLOAD_H */

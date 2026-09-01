@@ -159,11 +159,10 @@ int main(void)
 	while (1) {
 	touch_hmi_task_callback();	//串口屏幕控制
 	ESP32_232_communication_task_callback();// 处理ESP32从机指令
-	Sensor_Poll();// spi 接收数据
+	// Sensor_Poll();// spi 接收数据
 	power_communication_task_callback();// 处理电源板从机指令
 	FilterByDampedNum(damping_num);
 	DRV_CAN_ProcessData();
-	Can_Send();
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

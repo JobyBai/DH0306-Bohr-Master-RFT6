@@ -84,7 +84,7 @@ void Sensor_Control_Start_Mode2(void);
 void Sensor_Poll(void);
 void Control_Init(void);
 void Control_CanRxCallback(uint32_t ID, uint8_t *buf, uint8_t len);
-void Can_Send(void);
+void Process_Frame(void);
 
 
 

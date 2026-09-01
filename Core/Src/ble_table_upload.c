@@ -253,7 +253,7 @@ static uint16_t build_payload(uint8_t *payload, int row_idx)
 
         /* 列1: index */
         pos = append_byte(payload, pos, SEP); pos = append_byte(payload, pos, '1'); pos = append_byte(payload, pos, SEP);
-        snprintf(tmp, sizeof(tmp), "%lu", row_idx-3);// 从1开始
+        snprintf(tmp, sizeof(tmp), "%u", row_idx-3);// 从1开始
         pos = append_str(payload, pos, tmp);
 
         /* 列2: amplitude */
@@ -397,7 +397,7 @@ void BleUpload_OnAck(uint8_t success)
 
         if (s_tx.current_row >= s_tx.total_rows)
         {
-            ble_transfer_cancel = 0;// 上传完成, 重置取消标志
+            BleUpload_ChannelClose();// 上传完成, 关闭通道
             SetScreen(current_screen);// 返回上传页面
             s_tx.state = BLE_UPLOAD_DONE;
             printf("BleUpload: 全部数据上传完成！\r\n");
@@ -416,6 +416,7 @@ void BleUpload_OnAck(uint8_t success)
         if (s_tx.retry_count >= BLE_UPLOAD_MAX_RETRY)
         {
             s_tx.state = BLE_UPLOAD_ERROR;
+            SetScreen(0x000D);// 弹窗提示上传失败
             printf("BleUpload: 错误！第 %d 行连续失败 %d 次，上传已中止！\r\n",
                    s_tx.current_row + 1, BLE_UPLOAD_MAX_RETRY);
             return;
@@ -429,4 +430,18 @@ void BleUpload_OnAck(uint8_t success)
 BleUploadState_t BleUpload_GetState(void)
 {
     return s_tx.state;
+}
+
+
+// 传输通道关闭
+void BleUpload_ChannelClose(void)
+{
+    ble_transfer_cancel = 0;// 上传完成, 重置取消标志
+    s_tx.state = BLE_UPLOAD_DONE;// 上传完成, 重置状态
+    memset(ble_free_record_buf, 0, sizeof(ble_free_record_buf));// 清空自由振荡记录缓冲区
+    memset(ble_damped_record_buf, 0, sizeof(ble_damped_record_buf));// 清空阻尼振荡记录缓冲区
+    memset(ble_forced_record_buf, 0, sizeof(ble_forced_record_buf));// 清空受迫振荡记录缓冲区
+    ble_free_len = 0;// 清空自由振荡记录缓冲区长度
+    ble_damped_len = 0;// 清空阻尼振荡记录缓冲区长度
+    ble_forced_len = 0;// 清空受迫振荡记录缓冲区长度    
 }

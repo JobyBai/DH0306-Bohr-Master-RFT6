@@ -46,7 +46,7 @@ uint8_t demagnetize_msg[6] = { 0xAA, 0x08, 0x00, 0x00, 0x00, 0x55 }; // 继电�
 uint8_t demagnetize_open_msg[6] = { 0xAA, 0x0E, 0x00, 0x00, 0x00, 0x55 }; // 继电器位置：消磁 开启消磁
 uint8_t current_msg[6] = { 0xAA, 0x09, 0x00, 0x00, 0x00, 0x55 }; // 继电器位置：恒流源
 uint8_t target_current_msg[6] = { 0xAA, 0x6E, 0x00, 0x00, 0x00, 0x55 }; // 设置目标电流
-uint8_t motor_cycle_msg[6] = { 0xAA, 0x1D, 0x01, 0x00, 0xFA, 0x55 }; // 设置电机周期
+uint8_t motor_cycle_msg[6] = { 0xAA, 0x1E, 0x01, 0x00, 0xFA, 0x55 }; // 设置电机周期
 uint8_t motor_open_msg[6] = { 0xAA, 0x14, 0x00, 0x00, 0x00, 0x55 };  // 电机开启
 uint8_t motor_close_msg[6] = { 0xAA, 0x15, 0x00, 0x00, 0x00, 0x55 }; // 电机关闭
 uint8_t jog_msg[6] = { 0xAA, 0x1A, 0x00, 0x00, 0x00, 0x55 };         // 点动
@@ -60,7 +60,7 @@ uint16_t damping3 = 3;
 // 阻尼档位
 uint8_t damping_num = 1;
 //受迫表格档位选择
-uint8_t filter_damping_num = 0;
+uint8_t filter_damping_num = 1;
 
 // 连接方式 0x04: wifi 0x07: 蓝牙
 uint8_t connect_type = 0x04;
@@ -737,12 +737,13 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 			break;
 		}
 	}
-	if (screen_id == 0x0009) // 蓝牙传输中页面
+	if (screen_id == 0x0009) // 数据传输中页面
 			{
 		switch (control_id) {
 		case 0x02: // 取消传输
 			if (state == 0x01) {
-				ble_transfer_cancel = 0;
+				BleUpload_ChannelClose();// 关闭蓝牙上传通道
+				WifiUpload_ChannelClose();// 关闭wifi上传通道
 				SetScreen(current_screen);
 			}
 			break;
@@ -826,6 +827,20 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		switch (control_id) {
 		case 0x02: // 确认
 			if (state == 0x01) {
+				SetScreen(current_screen);
+			}
+			break;
+		default:
+			break;
+		}
+	}
+	if(screen_id == 0x000D) // 数据传输异常展示
+	{
+		switch (control_id) {
+		case 0x02: // 确认
+			if (state == 0x01) {
+				BleUpload_ChannelClose();// 关闭蓝牙上传通道
+				WifiUpload_ChannelClose();// 关闭wifi上传通道
 				SetScreen(current_screen);
 			}
 			break;
@@ -1055,7 +1070,7 @@ void touch_hmi_task_callback(void) {
 		hmi_updata_flag = 0;
 		UpdateUI();
 	}
-	if (wifi_signal_updata_flag) {
+	if (wifi_signal_updata_flag && wifi_transfer_type == 0 && ble_transfer_cancel == 0) { // 非上传时间段，获取wifi信号
 		wifi_signal_updata_flag = 0;
 		Get_Wifi_Signal_Strength();
 	}
