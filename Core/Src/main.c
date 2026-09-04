@@ -34,7 +34,9 @@
 #include "esp32.h"
 #include "power_control.h"
 #include "drv_can.h"
-
+#include "host_control.h"
+#include <stdio.h>
+#include <unistd.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -105,7 +107,6 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USART3_UART_Init();
   MX_SPI1_Init();
-  MX_SPI2_Init();
   MX_UART4_Init();
   MX_TIM4_Init();
   MX_CAN_Init();
@@ -138,14 +139,12 @@ int main(void)
 
   /*启动定时器4中断*/
   HAL_TIM_Base_Start_IT(&htim4);
-  Sensor_Control_Init();
-  Sensor_Control_Start_Mode1();
+//   Sensor_Control_Init();
+//   Sensor_Control_Start_Mode1();
 
   //初始化电机周期
   HAL_UART_Transmit(&huart4, motor_cycle_msg, 6, 100);
 
-  // 获取配置信息
-  //   GetConfigInfo();
   // CAN通讯
 // DRV_CAN_InitFilterList16(0x00A << 5, 0x00A << 5, 0x00A << 5, 0x00A << 5);
   DRV_CAN_InitFilterMask16(0x00, 0x00, 0x00, 0x00);
@@ -157,12 +156,16 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 	while (1) {
-	touch_hmi_task_callback();	//串口屏幕控制
-	ESP32_232_communication_task_callback();// 处理ESP32从机指令
-	// Sensor_Poll();// spi 接收数据
-	power_communication_task_callback();// 处理电源板从机指令
-	FilterByDampedNum(damping_num);
-	DRV_CAN_ProcessData();
+	//HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_12);
+	touch_hmi_task_callback();	//串口屏幕控制 3us
+	ESP32_232_communication_task_callback();// 处理ESP32从机指令 3us
+	host_communication_task_callback();//3us
+	power_communication_task_callback();// 处理电源板从机指令 3us
+	FilterByDampedNum(damping_num);//2us
+
+	DRV_CAN_ProcessData();//2us
+	collect_data_task_callback();//2us
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -213,6 +216,7 @@ void SystemClock_Config(void)
 // 用这个替换 fputc，newlib-nano 走的是 _write
 int _write(int fd, char *pBuffer, int size) {
 	HAL_UART_Transmit(&huart1, (uint8_t*) pBuffer, size, HAL_MAX_DELAY);
+//	HAL_UART_Transmit_DMA(&huart1, (uint8_t*) pBuffer, size);
 	return size;
 }
 

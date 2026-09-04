@@ -46,7 +46,7 @@ uint8_t demagnetize_msg[6] = { 0xAA, 0x08, 0x00, 0x00, 0x00, 0x55 }; // 继电�
 uint8_t demagnetize_open_msg[6] = { 0xAA, 0x0E, 0x00, 0x00, 0x00, 0x55 }; // 继电器位置：消磁 开启消磁
 uint8_t current_msg[6] = { 0xAA, 0x09, 0x00, 0x00, 0x00, 0x55 }; // 继电器位置：恒流源
 uint8_t target_current_msg[6] = { 0xAA, 0x6E, 0x00, 0x00, 0x00, 0x55 }; // 设置目标电流
-uint8_t motor_cycle_msg[6] = { 0xAA, 0x1E, 0x01, 0x00, 0xFA, 0x55 }; // 设置电机周期
+uint8_t motor_cycle_msg[6] = { 0xAA, 0x1E, 0x01, 0x00, 0xFA, 0x55 }; // 设置电机周期， 1E反转 1D正转
 uint8_t motor_open_msg[6] = { 0xAA, 0x14, 0x00, 0x00, 0x00, 0x55 };  // 电机开启
 uint8_t motor_close_msg[6] = { 0xAA, 0x15, 0x00, 0x00, 0x00, 0x55 }; // 电机关闭
 uint8_t jog_msg[6] = { 0xAA, 0x1A, 0x00, 0x00, 0x00, 0x55 };         // 点动
@@ -227,7 +227,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		case 0x01: // 自由震荡
 			if (state == 0x01) {
 				page_flag = 1;
-				Sensor_Control_Start_Mode1();
+//				Sensor_Control_Start_Mode1();
 				current_screen = 0x0001;
 				// 切换继电器位置：消磁
 				HAL_UART_Transmit(&huart4, demagnetize_msg, 6, 100);
@@ -236,7 +236,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		case 0x02: // 阻尼振荡
 			if (state == 0x01) {
 				page_flag = 2;
-				Sensor_Control_Start_Mode1();
+//				Sensor_Control_Start_Mode1();
 				current_screen = 0x0002;
 				// 切换继电器位置：恒流源
 				HAL_UART_Transmit(&huart4, current_msg, 6, 100);
@@ -245,7 +245,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		case 0x03: // 受迫振荡
 			if (state == 0x01) {
 				page_flag = 3;
-				Sensor_Control_Start_Mode1();
+//				Sensor_Control_Start_Mode1();
 				current_screen = 0x0003;
 				// 切换继电器位置：恒流源
 				HAL_UART_Transmit(&huart4, current_msg, 6, 100);
@@ -383,7 +383,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		{
 			if (state == 0x01) {
 				page_flag = 3;
-				Sensor_Control_Start_Mode1();
+//				Sensor_Control_Start_Mode1();
 				// 切换继电器位置：恒流源
 				HAL_UART_Transmit(&huart4, current_msg, 6, 100);
 			}
@@ -402,10 +402,10 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		switch (control_id) {
 		case 0x01: // 开关
 			if (state == 0x01) {
-				Sensor_Control_Start_Mode2();
+//				Sensor_Control_Start_Mode2();
 				HAL_UART_Transmit(&huart4, motor_open_msg, 6, 100);
 			} else if (state == 0x00) {
-				Sensor_Control_Start_Mode1();
+//				Sensor_Control_Start_Mode1();
 				HAL_UART_Transmit(&huart4, motor_close_msg, 6, 100);
 			}
 			break;
@@ -1126,13 +1126,6 @@ void SendDampingCoefficient(uint8_t item) {
 	}
 }
 
-/*!
- *  \brief  获取配置信息
- */
-void GetConfigInfo(void) {
-	uint8_t config_info[1] = { 0 };
-	stm32_to_esp32_data(get_config_info, config_info, 1, esp32_stm32);
-}
 
 /*!
  *  \brief  档位筛选
