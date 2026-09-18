@@ -83,12 +83,5 @@ void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 2 */
-// 外部中断
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-     if(GPIO_Pin == GPIO_PIN_12)
-     {
- //        Sensor_Receive();// 传感器数据接收
-     }
-}
+
 /* USER CODE END 2 */

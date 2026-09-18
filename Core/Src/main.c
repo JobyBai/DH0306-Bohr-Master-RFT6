@@ -143,7 +143,7 @@ int main(void)
 //   Sensor_Control_Start_Mode1();
 
   //初始化电机周期
-  HAL_UART_Transmit(&huart4, motor_cycle_msg, 6, 100);
+  HAL_UART_Transmit_DMA(&huart4, motor_cycle_msg, 6);
 
   // CAN通讯
 // DRV_CAN_InitFilterList16(0x00A << 5, 0x00A << 5, 0x00A << 5, 0x00A << 5);

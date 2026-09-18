@@ -6,6 +6,8 @@
 #include "sensor_control.h"
 #include "esp32.h"
 #include "vofa.h"
+#include "drv_can.h"
+
 
 typedef struct H_QUEUE {
 	h_qsize h_head;                                                       //队列头
@@ -140,6 +142,9 @@ void host_data_deal(uint8_t *data, uint16_t len) {
     if(data[2] != 0x20) return;
 	switch (data[3]) {
 	case 0x07:  // 开启双数据传输
+		//通知采集模块开始发送数据
+		DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_ADC_ENCODER, 8);
+		// 设置采集频率
 		uint16_t fre = data[4] << 8 | data[5];
         if (fre < 1 || fre > 1000) {
             fre = 1000;
@@ -148,6 +153,8 @@ void host_data_deal(uint8_t *data, uint16_t len) {
 		collect_flag = 1;
 		break;
 	case 0x08:  // 关闭双数据传输
+		//通知采集模块停止发送数据
+		DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_CLOSE_ADC_ENCODER, 8);
 		collect_flag = 0;
 		collect_frequency = 0;
 		break;

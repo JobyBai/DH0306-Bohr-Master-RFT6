@@ -73,6 +73,14 @@ extern Record_t filtered_record_buf[200]; // 受迫振荡 筛选结果缓存
 
 extern uint8_t output_str[128]; // 输出字符串缓存
 
+extern uint8_t CAN_SLAVE_ANSWER[8]; // 从机应答指令
+extern uint8_t CAN_SLAVE_ANSWER_AMPLITUDE[8]; // 获取振幅应答
+extern uint8_t CAN_SLAVE_ANSWER_PERIOD[8]; // 获取周期应答
+extern uint8_t CAN_SLAVE_ANSWER_PHASE_DIFF_1[8]; // 获取相位差1应答
+extern uint8_t CAN_SLAVE_ANSWER_PHASE_DIFF_2[8]; // 获取相位差2应答
+extern uint8_t CAN_SLAVE_ANSWER_ADC_ENCODER[8]; // 获取ADC值和编码器值应答
+extern uint8_t CAN_SLAVE_ANSWER_CLOSE_ADC_ENCODER[8]; // 关闭角度ADC和编码值获取
+
 
 #define ADC_ENCODER_BUF_SIZE 1000 // ADC与编码器数据环形队列长度
 typedef struct

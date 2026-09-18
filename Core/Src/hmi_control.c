@@ -18,6 +18,7 @@
 #include "string.h"
 #include "usart.h"
 #include "wifi_upload.h"
+#include "host_control.h"
 
 uint8_t device_id[8] = { 0x42, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36 }; // 设备ID
 // wifi 相关参数
@@ -230,7 +231,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 //				Sensor_Control_Start_Mode1();
 				current_screen = 0x0001;
 				// 切换继电器位置：消磁
-				HAL_UART_Transmit(&huart4, demagnetize_msg, 6, 100);
+				HAL_UART_Transmit_DMA(&huart4, demagnetize_msg, 6);
 			}
 			break;
 		case 0x02: // 阻尼振荡
@@ -239,7 +240,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 //				Sensor_Control_Start_Mode1();
 				current_screen = 0x0002;
 				// 切换继电器位置：恒流源
-				HAL_UART_Transmit(&huart4, current_msg, 6, 100);
+				HAL_UART_Transmit_DMA(&huart4, current_msg, 6);
 			}
 			break;
 		case 0x03: // 受迫振荡
@@ -248,7 +249,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 //				Sensor_Control_Start_Mode1();
 				current_screen = 0x0003;
 				// 切换继电器位置：恒流源
-				HAL_UART_Transmit(&huart4, current_msg, 6, 100);
+				HAL_UART_Transmit_DMA(&huart4, current_msg, 6);
 			}
 			break;
 		case 0x04: // 链接设置： 蓝牙 7 或 wifi 4
@@ -281,6 +282,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		case 0x05: // 上传
 			if (state == 0x01) {
 				current_screen = 0x0001;
+				if(collect_flag == 1) return; // 采集数据时不能上传
 				if (connect_type == 0x04) // wifi上传
 				{
 					if(wifi_connect_state != 2) // 未连接wifi
@@ -291,7 +293,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 					wifi_transfer_type = 1;	
 					Wifi_Start_TX();
 				} else if (connect_type == 0x07) // 蓝牙上传
-						{
+					{
 					ble_transfer_cancel = 1;
 					BleUpload_Start(BLE_MODE_FREE); // 自由振荡
 				}
@@ -358,6 +360,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 
 		case 0x05: // 上传
 			if (state == 0x01) {
+				if(collect_flag == 1) return; // 采集数据时不能上传
 				if (index_mode2 > 151)
 					return; // 防止越界, wifi传输最大数据量为200字节, 18字节为wifi标志,
 							// 100字节为数据, 18字节为count
@@ -385,7 +388,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				page_flag = 3;
 //				Sensor_Control_Start_Mode1();
 				// 切换继电器位置：恒流源
-				HAL_UART_Transmit(&huart4, current_msg, 6, 100);
+				HAL_UART_Transmit_DMA(&huart4, current_msg, 6);
 			}
 		}
 		case 0x0D: // 角度调整弹窗
@@ -403,17 +406,17 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		case 0x01: // 开关
 			if (state == 0x01) {
 //				Sensor_Control_Start_Mode2();
-				HAL_UART_Transmit(&huart4, motor_open_msg, 6, 100);
+				HAL_UART_Transmit_DMA(&huart4, motor_open_msg, 6);
 			} else if (state == 0x00) {
 //				Sensor_Control_Start_Mode1();
-				HAL_UART_Transmit(&huart4, motor_close_msg, 6, 100);
+				HAL_UART_Transmit_DMA(&huart4, motor_close_msg, 6);
 			}
 			break;
 		case 0x02: // 返回
 			if (state == 0x01) {
 				// 关闭电机
 				SetButtonValue(3, 1, 0);
-				HAL_UART_Transmit(&huart4, motor_close_msg, 6, 100);
+				HAL_UART_Transmit_DMA(&huart4, motor_close_msg, 6);
 			}
 			break;
 		case 0x03: // 速度+
@@ -429,7 +432,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				motor_cycle_msg[3] = (uint8_t) (ms_part >> 8);   // 毫秒高字节
 				motor_cycle_msg[4] = (uint8_t) (ms_part & 0xFF); // 毫秒低字节
 
-				HAL_UART_Transmit(&huart4, motor_cycle_msg, 6, 100);
+				HAL_UART_Transmit_DMA(&huart4, motor_cycle_msg, 6);
 			}
 			break;
 		case 0x05: // 速度-
@@ -445,7 +448,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				motor_cycle_msg[3] = (uint8_t) (ms_part >> 8);   // 毫秒高字节
 				motor_cycle_msg[4] = (uint8_t) (ms_part & 0xFF); // 毫秒低字节
 
-				HAL_UART_Transmit(&huart4, motor_cycle_msg, 6, 100);
+				HAL_UART_Transmit_DMA(&huart4, motor_cycle_msg, 6);
 			}
 			break;
 		case 0x04: // 步进+
@@ -488,7 +491,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 			if (state == 0x01) {
 				// 关闭电机
 				SetButtonValue(3, 1, 0);
-				HAL_UART_Transmit(&huart4, motor_close_msg, 6, 100);
+				HAL_UART_Transmit_DMA(&huart4, motor_close_msg, 6);
 				current_screen = 0x0003;
 			}
 			break;
@@ -562,6 +565,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 			break;
 		case 0x04:
 			if (state == 0x01) {
+				if(collect_flag == 1) return; // 采集数据时不能上传
 				uint8_t count = index_mode3 - 1; // 实际记录数
 				if (count > 81)
 					return;
@@ -789,7 +793,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				jog_msg[2] = 0x01;                  // 正向
 				jog_msg[3] = (jog_num >> 8) & 0xFF; // jog_num 高字节
 				jog_msg[4] = jog_num & 0xFF;        // jog_num 低字节
-				HAL_UART_Transmit(&huart4, jog_msg, 6, 100);
+				HAL_UART_Transmit_DMA(&huart4, jog_msg, 6);
 			}
 			break;
 
@@ -798,7 +802,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				jog_msg[2] = 0x00; // 反向
 				jog_msg[3] = (jog_num >> 8) & 0xFF;
 				jog_msg[4] = jog_num & 0xFF;
-				HAL_UART_Transmit(&huart4, jog_msg, 6, 100);
+				HAL_UART_Transmit_DMA(&huart4, jog_msg, 6);
 			}
 			break;
 		case 0x05: // 关闭
@@ -1111,17 +1115,17 @@ void SendDampingCoefficient(uint8_t item) {
 	if (item == 1) {
 		target_current_msg[2] = (uint8_t) (damping1 >> 8);
 		target_current_msg[3] = (uint8_t) (damping1 & 0xFF);
-		HAL_UART_Transmit(&huart4, target_current_msg, 6, 100);
+		HAL_UART_Transmit_DMA(&huart4, target_current_msg, 6);
 		return;
 	} else if (item == 2) {
 		target_current_msg[2] = (uint8_t) (damping2 >> 8);
 		target_current_msg[3] = (uint8_t) (damping2 & 0xFF);
-		HAL_UART_Transmit(&huart4, target_current_msg, 6, 100);
+		HAL_UART_Transmit_DMA(&huart4, target_current_msg, 6);
 		return;
 	} else if (item == 3) {
 		target_current_msg[2] = (uint8_t) (damping3 >> 8);
 		target_current_msg[3] = (uint8_t) (damping3 & 0xFF);
-		HAL_UART_Transmit(&huart4, target_current_msg, 6, 100);
+		HAL_UART_Transmit_DMA(&huart4, target_current_msg, 6);
 		return;
 	}
 }

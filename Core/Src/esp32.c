@@ -173,7 +173,7 @@ y_qsize y_queue_find_cmd2(y_qdata *buffer, y_qsize buf_len)
 
 void ESP32_ack_data(uint8_t *p ,uint16_t len)
 {
-	HAL_UART_Transmit(&huart2, p, len, 1000);
+	HAL_UART_Transmit(&huart2, p, len, 100);
 }
 
 

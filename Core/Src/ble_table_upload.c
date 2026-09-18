@@ -334,7 +334,7 @@ static uint16_t build_frame(uint8_t *buf, int row_idx)
 static void send_current_row(void)
 {
     s_tx.buf_len = build_frame(s_tx.buf, s_tx.current_row);
-    HAL_UART_Transmit(&huart2, s_tx.buf, s_tx.buf_len, 1000);
+    HAL_UART_Transmit(&huart2, s_tx.buf, s_tx.buf_len, 100);
     s_tx.state = BLE_UPLOAD_SENDING;
 }
 
@@ -423,7 +423,7 @@ void BleUpload_OnAck(uint8_t success)
         }
 
         /* 重发：buf 内容未变，直接重传 */
-        HAL_UART_Transmit(&huart2, s_tx.buf, s_tx.buf_len, 1000);
+        HAL_UART_Transmit(&huart2, s_tx.buf, s_tx.buf_len, 100);
     }
 }
 

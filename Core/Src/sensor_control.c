@@ -14,6 +14,8 @@ uint8_t CAN_SLAVE_ANSWER_AMPLITUDE[8] = { 0x00, 0x21 }; // 获取振幅应答
 uint8_t CAN_SLAVE_ANSWER_PERIOD[8] = { 0x00, 0x22 }; // 获取周期应答
 uint8_t CAN_SLAVE_ANSWER_PHASE_DIFF_1[8] = { 0x00, 0x23 }; // 获取相位差1应答
 uint8_t CAN_SLAVE_ANSWER_PHASE_DIFF_2[8] = { 0x00, 0x24 }; // 获取相位差2应答
+uint8_t CAN_SLAVE_ANSWER_ADC_ENCODER[8] = { 0x00, 0x26 }; // 获取ADC值和编码器值应答
+uint8_t CAN_SLAVE_ANSWER_CLOSE_ADC_ENCODER[8] = { 0x00, 0x27 }; // 关闭角度ADC和编码值获取
 
 
 ///* ───── DMA 环形缓冲区 ───── */

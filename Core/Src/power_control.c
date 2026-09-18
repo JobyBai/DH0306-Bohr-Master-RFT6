@@ -104,7 +104,7 @@ void power_data_deal(uint8_t *data,uint16_t len)
     
     switch(data[1]){
         case 0x08:  // 切换继电器位置：消磁成功
-	        HAL_UART_Transmit(&huart4, demagnetize_open_msg, 6, 100);// 开启消磁
+	        HAL_UART_Transmit_DMA(&huart4, demagnetize_open_msg, 6);// 开启消磁
             break;
         case 0x09:  // 切换继电器位置：恒流源 				
 			SendDampingCoefficient(damping_num);// 发送阻尼系数
