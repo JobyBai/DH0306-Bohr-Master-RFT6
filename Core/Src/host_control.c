@@ -142,6 +142,9 @@ void host_data_deal(uint8_t *data, uint16_t len) {
     if(data[2] != 0x20) return;
 	switch (data[3]) {
 	case 0x07:  // 开启双数据传输
+		// 开始数据采集前，先通知采集模块初始化
+    	DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER, 8);
+		HAL_Delay(100);
 		//通知采集模块开始发送数据
 		DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_ADC_ENCODER, 8);
 		// 设置采集频率
@@ -203,9 +206,9 @@ void collect_data_task_callback(void) {
 				test_msg[i*4+9] = collect_buf[i].encoder_value & 0xFF;
 			}
 			test_msg[206] = sum_low_8bits(test_msg, 206);
-			HAL_UART_Transmit_DMA(&huart1, test_msg, 207); // 发送数据
+			 HAL_UART_Transmit_DMA(&huart1, test_msg, 207); // 发送数据
 		}
-			// VofaSend_Task(adc_encoder_buf[rd].adc_value, adc_encoder_buf[rd].encoder_value);// 上位机测试代码
+			// VofaSend_Task(adc_encoder_buf[adc_encoder_index].adc_value, adc_encoder_buf[adc_encoder_index].encoder_value);// 上位机测试代码
 	}
 	last_index = adc_encoder_index;
 }

@@ -80,6 +80,8 @@ extern uint8_t CAN_SLAVE_ANSWER_PHASE_DIFF_1[8]; // 获取相位差1应答
 extern uint8_t CAN_SLAVE_ANSWER_PHASE_DIFF_2[8]; // 获取相位差2应答
 extern uint8_t CAN_SLAVE_ANSWER_ADC_ENCODER[8]; // 获取ADC值和编码器值应答
 extern uint8_t CAN_SLAVE_ANSWER_CLOSE_ADC_ENCODER[8]; // 关闭角度ADC和编码值获取
+extern uint8_t CAN_SLAVE_ANSWER_VOLTAGE[8]; // 获取电压值应答
+extern uint8_t CAN_SLAVE_ANSWER_SET_VOLTAGE[8]; // 设置电压值应答
 
 
 #define ADC_ENCODER_BUF_SIZE 1000 // ADC与编码器数据环形队列长度

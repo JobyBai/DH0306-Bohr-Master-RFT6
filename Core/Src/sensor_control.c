@@ -16,7 +16,8 @@ uint8_t CAN_SLAVE_ANSWER_PHASE_DIFF_1[8] = { 0x00, 0x23 }; // 获取相位差1�
 uint8_t CAN_SLAVE_ANSWER_PHASE_DIFF_2[8] = { 0x00, 0x24 }; // 获取相位差2应答
 uint8_t CAN_SLAVE_ANSWER_ADC_ENCODER[8] = { 0x00, 0x26 }; // 获取ADC值和编码器值应答
 uint8_t CAN_SLAVE_ANSWER_CLOSE_ADC_ENCODER[8] = { 0x00, 0x27 }; // 关闭角度ADC和编码值获取
-
+uint8_t CAN_SLAVE_ANSWER_VOLTAGE[8] = { 0x00, 0x28 }; // 获取电压值应答
+uint8_t CAN_SLAVE_ANSWER_SET_VOLTAGE[8] = { 0x00, 0x29 }; // 设置电压值应答
 
 ///* ───── DMA 环形缓冲区 ───── */
 //static uint8_t dma_buf[SENSOR_DMA_BUF_SIZE];
@@ -42,6 +43,9 @@ uint8_t output_str[128]; // 输出字符串缓存
 
 ADC_Encoder_t adc_encoder_buf[ADC_ENCODER_BUF_SIZE]; // ADC值与编码器值环形队列
 uint16_t adc_encoder_index = 0;                      // 环形队列写指针
+
+
+float voltage = 0.0f; // 磁角度传感器电压值
 
 // void Sensor_Control_Init(void) {
 // 	Sensor_Control_Stop();
@@ -246,6 +250,13 @@ void Control_CanRxCallback(uint32_t ID, uint8_t *buf, uint8_t len) {
         // 环形写入：写满后回到头部，覆盖最旧数据
         adc_encoder_index = (adc_encoder_index + 1) % ADC_ENCODER_BUF_SIZE;
         break;
+	case 0x28: // 获取电压值
+		memcpy(&voltage, &buf[2], sizeof(float));
+		SetTextFloat(0x000E, 0x03, voltage, 3, 1);
+		break;
+	case 0x29: // 设置电压值
+		SetScreen(0x000F);// 弹窗提示成功
+		break;
 	default:
 		break;
 	}

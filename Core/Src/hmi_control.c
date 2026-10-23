@@ -19,6 +19,7 @@
 #include "usart.h"
 #include "wifi_upload.h"
 #include "host_control.h"
+#include "drv_can.h"
 
 uint8_t device_id[8] = { 0x42, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36 }; // 设备ID
 // wifi 相关参数
@@ -171,6 +172,9 @@ uint8_t current_screen_id = 0;
  *  \param screen_id 当前屏幕ID
  */
 void NotifyScreen(uint16_t screen_id) {
+	if(screen_id == 0x000E){
+		current_screen = screen_id;
+	}
 }
 
 /*!
@@ -212,6 +216,10 @@ void UpdateUI() {
 	SetTextValue(7, 3, ble_name);
 	SetTextValue(7, 4, ble_mac);
 	SetTextValue(7, 5, ble_paring);
+	if (current_screen == 0x000E) {
+		// 获取电压值
+		DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_VOLTAGE, 8);
+	}
 }
 
 /*!
@@ -405,10 +413,22 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		switch (control_id) {
 		case 0x01: // 开关
 			if (state == 0x01) {
-//				Sensor_Control_Start_Mode2();
+				if (motor_cycle > 2.0f)
+					motor_cycle = 2.0f;                    // 加完再夹紧
+				uint8_t int_part = (uint8_t) motor_cycle; // 整数秒
+				uint16_t ms_part = (uint16_t) ((motor_cycle - int_part) * 1000
+						+ 0.5f); // 小数转毫秒，四舍五入
+
+				motor_cycle_msg[2] = int_part;
+				motor_cycle_msg[3] = (uint8_t) (ms_part >> 8);   // 毫秒高字节
+				motor_cycle_msg[4] = (uint8_t) (ms_part & 0xFF); // 毫秒低字节
+
+				HAL_UART_Transmit_DMA(&huart4, motor_cycle_msg, 6);
+				HAL_Delay(50);
+				// 启动受迫震荡前，先通知采集模块初始化
+    			DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER, 8);
 				HAL_UART_Transmit_DMA(&huart4, motor_open_msg, 6);
 			} else if (state == 0x00) {
-//				Sensor_Control_Start_Mode1();
 				HAL_UART_Transmit_DMA(&huart4, motor_close_msg, 6);
 			}
 			break;
@@ -630,13 +650,13 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 			break;
 		case 0x07: // 阻尼1+
 			if (state == 0x02) {
-				damping1 = (damping1 + 10 > 350) ? 350 : damping1 + 10; // 长按步进10，防溢出
+				damping1 = (damping1 + 10 > 700) ? 700 : damping1 + 10; // 长按步进10，防溢出
 			} else if (state == 0x01) {
-				if (damping1 < 350)
+				if (damping1 < 700)
 					damping1++;
 			} else if (state == 0x00) { // 松开时写入 Flash
-				if (damping1 > 350)
-					damping1 = 350;
+				if (damping1 > 700)
+					damping1 = 700;
 				sfud_erase_write(g_flash, FLASH_SAVE_ADDR + FLASH_DAMPING1_ADDR,
 						sizeof(damping1), (uint8_t*) &damping1);
 			}
@@ -649,21 +669,21 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				if (damping1 > 0)
 					damping1--;
 			} else if (state == 0x00) { // 松开时写入 Flash
-				if (damping1 > 350)
-					damping1 = 350;
+				if (damping1 > 700)
+					damping1 = 700;
 				sfud_erase_write(g_flash, FLASH_SAVE_ADDR + FLASH_DAMPING1_ADDR,
 						sizeof(damping1), (uint8_t*) &damping1);
 			}
 			break;
 		case 0x09: // 阻尼2+
 			if (state == 0x02) {
-				damping2 = (damping2 + 10 > 350) ? 350 : damping2 + 10; // 长按步进10，防溢出
+				damping2 = (damping2 + 10 > 700) ? 700 : damping2 + 10; // 长按步进10，防溢出
 			} else if (state == 0x01) {
-				if (damping2 < 350)
+				if (damping2 < 700)
 					damping2++;
 			} else if (state == 0x00) { // 松开时写入 Flash
-				if (damping2 > 350)
-					damping2 = 350;
+				if (damping2 > 700)
+					damping2 = 700;
 				sfud_erase_write(g_flash, FLASH_SAVE_ADDR + FLASH_DAMPING2_ADDR,
 						sizeof(damping2), (uint8_t*) &damping2);
 			}
@@ -675,21 +695,21 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				if (damping2 > 0)
 					damping2--;
 			} else if (state == 0x00) { // 松开时写入 Flash
-				if (damping2 > 350)
-					damping2 = 350;
+				if (damping2 > 700)
+					damping2 = 700;
 				sfud_erase_write(g_flash, FLASH_SAVE_ADDR + FLASH_DAMPING2_ADDR,
 						sizeof(damping2), (uint8_t*) &damping2);
 			}
 			break;
 		case 0x0B: // 阻尼3+
 			if (state == 0x02) {
-				damping3 = (damping3 + 10 > 350) ? 350 : damping3 + 10; // 长按步进10，防溢出
+				damping3 = (damping3 + 10 > 700) ? 700 : damping3 + 10; // 长按步进10，防溢出
 			} else if (state == 0x01) {
-				if (damping3 < 350)
+				if (damping3 < 700)
 					damping3++;
 			} else if (state == 0x00) { // 松开时写入 Flash
-				if (damping3 > 350)
-					damping3 = 350;
+				if (damping3 > 700)
+					damping3 = 700;
 				sfud_erase_write(g_flash, FLASH_SAVE_ADDR + FLASH_DAMPING3_ADDR,
 						sizeof(damping3), (uint8_t*) &damping3);
 			}
@@ -703,8 +723,8 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				if (damping3 > 0)
 					damping3--;
 			} else if (state == 0x00) { // 松开时写入 Flash
-				if (damping3 > 350)
-					damping3 = 350;
+				if (damping3 > 700)
+					damping3 = 700;
 				sfud_erase_write(g_flash, FLASH_SAVE_ADDR + FLASH_DAMPING3_ADDR,
 						sizeof(damping3), (uint8_t*) &damping3);
 			}
@@ -846,6 +866,18 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				BleUpload_ChannelClose();// 关闭蓝牙上传通道
 				WifiUpload_ChannelClose();// 关闭wifi上传通道
 				SetScreen(current_screen);
+			}
+			break;
+		default:
+			break;
+		}
+	}
+	if (screen_id == 0x000E) // 电压校准设置
+	{
+		switch (control_id) {
+		case 0x01: // 设置电压
+			if (state == 0x01) {
+				DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_SET_VOLTAGE, 8);
 			}
 			break;
 		default:
