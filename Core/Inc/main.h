@@ -44,6 +44,9 @@ extern const sfud_flash *g_flash;  /* flash读写全局指针 */
 #define FLASH_DAMPING2_ADDR   0x001000   // 扇区1
 #define FLASH_DAMPING3_ADDR   0x002000   // 扇区2
 #define FLASH_CONNECT_ADDR   0x003000   // 连接设置扇区
+#define FLASH_DEVICE_VERSION_ADDR       0x004000   // 设备版本扇区
+#define FLASH_DEVICE_ID_ADDR       0x005000   // 设备ID扇区
+
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/

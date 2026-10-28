@@ -21,7 +21,12 @@
 #include "host_control.h"
 #include "drv_can.h"
 
-uint8_t device_id[8] = { 0x42, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36 }; // 设备ID
+uint8_t device_version = 0; // 设备版本 0-未设置 1-普通版本 2-AI版本 3-网络版本
+
+uint8_t device_id[DEVICE_ID_MAX_LEN] = {
+    0x42, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36
+}; // 设备ID
+uint8_t device_id_len = 8;
 // wifi 相关参数
 uint8_t wlan_sid[60] = { 0 };          // wifi SSID
 uint8_t wlan_password[60] = { 0 };     // wifi 密码
@@ -618,34 +623,36 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		switch (control_id) {
 		case 0x01:             // wifi开关
 			if (state == 0x01) { // 开启
-				SetButtonValue(6, 2, 0);
-				SetButtonValue(7, 1, 0);
-				AnimationPlayFrame(0, 0x07, 0);
-				AnimationPlayFrame(1, 0x08, 0);
-				AnimationPlayFrame(2, 0x0C, 0);
-				AnimationPlayFrame(5, 0x08, 0);
-				// 设置连接方式为wifi
-				connect_type = 0x04;
-				sfud_erase_write(g_flash, FLASH_CONNECT_ADDR,
-						sizeof(connect_type), &connect_type);
+				Open_Wifi_Config();
+				// SetButtonValue(6, 2, 0);
+				// SetButtonValue(7, 1, 0);// 关闭蓝牙开关
+				// AnimationPlayFrame(0, 0x07, 0);
+				// AnimationPlayFrame(1, 0x08, 0);
+				// AnimationPlayFrame(2, 0x0C, 0);
+				// AnimationPlayFrame(5, 0x08, 0);
+				// // 设置连接方式为wifi
+				// connect_type = 0x04;
+				// sfud_erase_write(g_flash, FLASH_CONNECT_ADDR,
+				// 		sizeof(connect_type), &connect_type);
 			} else if (state == 0x00) {
-				SetButtonValue(6, 1, 1);
+				// SetButtonValue(6, 1, 1);
 			}
 			break;
 		case 0x02:             // 蓝牙开关
 			if (state == 0x01) { // 开启
-				SetButtonValue(6, 1, 0);
-				SetButtonValue(4, 2, 0);
-				AnimationPlayFrame(0, 0x07, 2);
-				AnimationPlayFrame(1, 0x08, 1);
-				AnimationPlayFrame(2, 0x0C, 1);
-				AnimationPlayFrame(5, 0x08, 1);
-				// 设置连接方式为蓝牙
-				connect_type = 0x07;
-				sfud_erase_write(g_flash, FLASH_CONNECT_ADDR,
-						sizeof(connect_type), &connect_type);
+				Open_Bluetooth_Config();
+				// SetButtonValue(6, 1, 0);
+				// SetButtonValue(4, 2, 0);// 关闭wifi开关
+				// AnimationPlayFrame(0, 0x07, 2);
+				// AnimationPlayFrame(1, 0x08, 1);
+				// AnimationPlayFrame(2, 0x0C, 1);
+				// AnimationPlayFrame(5, 0x08, 1);
+				// // 设置连接方式为蓝牙
+				// connect_type = 0x07;
+				// sfud_erase_write(g_flash, FLASH_CONNECT_ADDR,
+				// 		sizeof(connect_type), &connect_type);
 			} else if (state == 0x00) {
-				SetButtonValue(6, 2, 1);
+				// SetButtonValue(6, 2, 1);
 			}
 			break;
 		case 0x07: // 阻尼1+
@@ -872,12 +879,45 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 			break;
 		}
 	}
-	if (screen_id == 0x000E) // 电压校准设置
+	if (screen_id == 0x000E) // 调试设置页面
 	{
 		switch (control_id) {
 		case 0x01: // 设置电压
 			if (state == 0x01) {
 				DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_SET_VOLTAGE, 8);
+			}
+			break;
+		case 0x04: // 设置成普通版本: wifi禁用
+			if (state == 0x01) {
+				device_version = 0x01;
+				SetTextValue(0, 8, (unsigned char *)" ");
+				sfud_erase_write(g_flash, FLASH_DEVICE_VERSION_ADDR,
+						sizeof(device_version), &device_version);
+				SetControlEnable(6, 1, 0);// wifi禁用
+				// 开启蓝牙配置
+				Open_Bluetooth_Config();
+			}
+			break;
+		case 0x05: // 设置成AI版本： wifi禁用
+			if (state == 0x01) {
+				device_version = 0x02;
+				SetTextValue(0, 8, (unsigned char *)" ");
+				sfud_erase_write(g_flash, FLASH_DEVICE_VERSION_ADDR,
+						sizeof(device_version), &device_version);
+				SetControlEnable(6, 1, 0);// wifi禁用
+				// 开启蓝牙配置
+				Open_Bluetooth_Config();
+			}
+			break;
+		case 0x06: // 设置成网络版本
+			if (state == 0x01) {
+				device_version = 0x03;
+				sfud_erase_write(g_flash, FLASH_DEVICE_VERSION_ADDR,
+						sizeof(device_version), &device_version);
+				SetTextValue(0, 8, (unsigned char *)" ");
+				SetControlEnable(6, 1, 1);// wifi启用
+				// 开启wifi配置
+				Open_Wifi_Config();
 			}
 			break;
 		default:
@@ -888,22 +928,25 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 
 // 文本输入
 void NotifyText(uint16_t screen_id, uint16_t control_id, const char *str) {
-	if (screen_id == 0x0000) // 首页
+	if (screen_id == 0x0006) // 参数设置页
 			{
 		switch (control_id) {
-		case 0x06: // 设备编号
+		case 0x0C: // 设备ID
 			if (str == NULL) {
 				break;
 			}
 
-			size_t len = strlen(str);
-			if (len > 8) {
-				// 长度不符合要求，拒绝保存，可按需添加错误提示
-				break;
-			}
+            size_t len = strlen(str);
+            if (len == 0 || len > DEVICE_ID_MAX_LEN) {
+                // 长度不符合要求，拒绝保存，可按需添加错误提示
+//                SetTextValue(6, 0x0C, "长度不符合要求，请重新填写");
+                break;
+            }
 
-			memset(device_id, 0, sizeof(device_id));
-			memcpy(device_id, str, len);
+            memset(device_id, 0, DEVICE_ID_MAX_LEN);
+            memcpy(device_id, str, len);
+            device_id_len = (uint8_t)len;
+            sfud_erase_write(g_flash, FLASH_DEVICE_ID_ADDR, DEVICE_ID_MAX_LEN, device_id);
 			break;
 		default:
 			break;
@@ -1116,6 +1159,32 @@ void touch_hmi_task_callback(void) {
  *  \brief  获取flash数据
  */
 void GetFlashData(void) {
+	// 读取设备版本 0-未设置 1-普通版本 2-AI版本 3-网络版本
+	sfud_read(g_flash, FLASH_DEVICE_VERSION_ADDR, sizeof(device_version),
+			&device_version);
+	if (device_version == 0x01 || device_version == 0x02 || device_version == 0x03) {
+		SetTextValue(0, 8, (unsigned char *)" ");
+		SetButtonValue(0x000E, device_version + 3, 1);
+	} else {
+       SetTextValue(0, 8, (unsigned char *)"\xCE\xB4\xCD\xEA\xB3\xC9\xBC\xEC\xD1\xE9");
+	}
+	// 读取设备ID	
+    uint8_t device_id_str[DEVICE_ID_MAX_LEN + 1] = { 0 };
+
+    sfud_read(g_flash, FLASH_DEVICE_ID_ADDR,
+            DEVICE_ID_MAX_LEN, device_id);// 读取设备ID
+
+    device_id_len = 0;
+    while (device_id_len < DEVICE_ID_MAX_LEN
+            && device_id[device_id_len] != '\0'
+            && device_id[device_id_len] != 0xFF) {
+        device_id_len++;
+    }
+
+    memcpy(device_id_str, device_id, device_id_len);
+    device_id_str[device_id_len] = '\0';
+    SetTextValue(6, 0x0C, (unsigned char *)device_id_str);
+
 	sfud_read(g_flash, FLASH_SAVE_ADDR + FLASH_DAMPING1_ADDR, 2,
 			(uint8_t*) &damping1);
 	sfud_read(g_flash, FLASH_SAVE_ADDR + FLASH_DAMPING2_ADDR, 2,
@@ -1137,6 +1206,7 @@ void GetFlashData(void) {
 		AnimationPlayFrame(2, 0x0C, 1);
 		AnimationPlayFrame(5, 0x08, 1);
 	}
+	
 }
 
 /*
@@ -1295,4 +1365,35 @@ void FilterByDampedNum(uint8_t num) {
 
     last_damping_num = num;
     last_index_mode2 = index_mode2;
+}
+
+
+//  开启蓝牙配置
+void Open_Bluetooth_Config(void) 
+{
+	SetButtonValue(6, 1, 0); 
+	SetButtonValue(4, 2, 0);// 关闭wifi开关
+	AnimationPlayFrame(0, 0x07, 2);
+	AnimationPlayFrame(1, 0x08, 1);
+	AnimationPlayFrame(2, 0x0C, 1);
+	AnimationPlayFrame(5, 0x08, 1);
+	// 设置连接方式为蓝牙
+	connect_type = 0x07;
+	sfud_erase_write(g_flash, FLASH_CONNECT_ADDR,sizeof(connect_type), &connect_type);
+	SetButtonValue(6, 2, 1); 
+}
+
+// 开启wifi配置
+void Open_Wifi_Config(void) 
+{
+	SetButtonValue(6, 2, 0);
+	SetButtonValue(7, 1, 0);// 关闭蓝牙开关
+	AnimationPlayFrame(0, 0x07, 0);
+	AnimationPlayFrame(1, 0x08, 0);
+	AnimationPlayFrame(2, 0x0C, 0);
+	AnimationPlayFrame(5, 0x08, 0);
+	// 设置连接方式为wifi
+	connect_type = 0x04;
+	sfud_erase_write(g_flash, FLASH_CONNECT_ADDR,sizeof(connect_type), &connect_type);
+	SetButtonValue(6, 1, 1); 
 }

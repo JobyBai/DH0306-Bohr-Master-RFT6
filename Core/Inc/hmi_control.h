@@ -13,7 +13,10 @@
 #include "tim.h"
 #include "usart.h"
 
-extern uint8_t device_id[8];//设备ID
+extern uint8_t device_version;//设备版本 0-未设置 1-普通版本 2-AI版本 3-网络版本
+#define DEVICE_ID_MAX_LEN 32
+extern uint8_t device_id[DEVICE_ID_MAX_LEN];//设备ID
+extern uint8_t device_id_len;//设备ID实际长度
 // wifi参数
 extern uint8_t wlan_sid[60];
 extern uint8_t wlan_password[60];
@@ -66,6 +69,8 @@ void SendDampingCoefficient(uint8_t item);
 void GetConfigInfo(void);
 void FilterData(uint8_t target_damping);
 void FilterByDampedNum(uint8_t num);
+void Open_Bluetooth_Config(void);
+void Open_Wifi_Config(void);
 
 
 #endif /* INC_HMI_CONTROL_H_ */
