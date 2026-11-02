@@ -36,6 +36,11 @@ uint8_t temp_data_4[1];
 uint8_t usart2_dma_Buffer[BUF_SIZE];
 volatile uint16_t usart2_read_Index = 0;    // 已读取的位置
 
+
+uint8_t usart1_dma_Buffer[BUF_SIZE];
+volatile uint16_t usart1_read_Index = 0;    // 已读取的位置
+
+
 /* USER CODE END 0 */
 
 UART_HandleTypeDef huart4;
@@ -44,6 +49,7 @@ UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 DMA_HandleTypeDef hdma_uart4_tx;
 DMA_HandleTypeDef hdma_usart1_tx;
+DMA_HandleTypeDef hdma_usart1_rx;
 DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
@@ -100,7 +106,10 @@ void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
-	HAL_UART_Receive_IT(&huart1, temp_data_1, 1); //接收中断
+	// HAL_UART_Receive_IT(&huart1, temp_data_1, 1); //接收中断
+  __HAL_UART_ENABLE_IT(&huart1, UART_IT_IDLE);
+  __HAL_UART_CLEAR_IDLEFLAG(&huart1);
+  HAL_UART_Receive_DMA(&huart1, usart1_dma_Buffer, BUF_SIZE); // 传入句柄指针
   /* USER CODE END USART1_Init 2 */
 
 }
@@ -202,7 +211,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     hdma_uart4_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
     hdma_uart4_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
     hdma_uart4_tx.Init.Mode = DMA_NORMAL;
-    hdma_uart4_tx.Init.Priority = DMA_PRIORITY_HIGH;
+    hdma_uart4_tx.Init.Priority = DMA_PRIORITY_MEDIUM;
     if (HAL_DMA_Init(&hdma_uart4_tx) != HAL_OK)
     {
       Error_Handler();
@@ -249,13 +258,29 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     hdma_usart1_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
     hdma_usart1_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
     hdma_usart1_tx.Init.Mode = DMA_NORMAL;
-    hdma_usart1_tx.Init.Priority = DMA_PRIORITY_HIGH;
+    hdma_usart1_tx.Init.Priority = DMA_PRIORITY_MEDIUM;
     if (HAL_DMA_Init(&hdma_usart1_tx) != HAL_OK)
     {
       Error_Handler();
     }
 
     __HAL_LINKDMA(uartHandle,hdmatx,hdma_usart1_tx);
+
+    /* USART1_RX Init */
+    hdma_usart1_rx.Instance = DMA1_Channel5;
+    hdma_usart1_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_usart1_rx.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_usart1_rx.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_usart1_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+    hdma_usart1_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+    hdma_usart1_rx.Init.Mode = DMA_CIRCULAR;
+    hdma_usart1_rx.Init.Priority = DMA_PRIORITY_MEDIUM;
+    if (HAL_DMA_Init(&hdma_usart1_rx) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    __HAL_LINKDMA(uartHandle,hdmarx,hdma_usart1_rx);
 
     /* USART1 interrupt Init */
     HAL_NVIC_SetPriority(USART1_IRQn, 0, 0);
@@ -312,7 +337,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
     hdma_usart2_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
     hdma_usart2_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
     hdma_usart2_tx.Init.Mode = DMA_NORMAL;
-    hdma_usart2_tx.Init.Priority = DMA_PRIORITY_HIGH;
+    hdma_usart2_tx.Init.Priority = DMA_PRIORITY_LOW;
     if (HAL_DMA_Init(&hdma_usart2_tx) != HAL_OK)
     {
       Error_Handler();
@@ -401,6 +426,7 @@ void HAL_UART_MspDeInit(UART_HandleTypeDef* uartHandle)
 
     /* USART1 DMA DeInit */
     HAL_DMA_DeInit(uartHandle->hdmatx);
+    HAL_DMA_DeInit(uartHandle->hdmarx);
 
     /* USART1 interrupt Deinit */
     HAL_NVIC_DisableIRQ(USART1_IRQn);
@@ -469,10 +495,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) //串口中断回调
   else if (huart->Instance == USART3) {// 串口屏幕
 		queue_push(temp_data_3[0]);
 		HAL_UART_Receive_IT(&huart3, temp_data_3, 1);
-	}else if (huart->Instance == USART1) {// 上位机
-		h_queue_push(temp_data_1[0]);
-		HAL_UART_Receive_IT(&huart1, temp_data_1, 1); //接收中断
 	}
+  // else if (huart->Instance == USART1) {// 上位机
+	// 	h_queue_push(temp_data_1[0]);
+	// 	HAL_UART_Receive_IT(&huart1, temp_data_1, 1); //接收中断
+	// }
 
 }
 
@@ -536,6 +563,31 @@ void USER_UART_IRQHandler(UART_HandleTypeDef *huart)
       HAL_UART_Receive_DMA(huart, usart2_dma_Buffer, BUF_SIZE); // 重新启动DMA
       usart2_read_Index = 0;            // 重置读指针
     }
+  }  
+  else if (huart->Instance == USART1) // 串口上位机
+  {
+    __HAL_UART_CLEAR_IDLEFLAG(huart);
+    uint16_t usart1_new_write = (BUF_SIZE - __HAL_DMA_GET_COUNTER(huart->hdmarx)) % BUF_SIZE;
+
+    if (usart1_new_write >= usart1_read_Index)       // 处理从 readIndex 到 new_write 之间的数据（注意环形绕回）
+    {
+      for (uint16_t i = usart1_read_Index; i < usart1_new_write; i++)
+      {
+        h_queue_push(usart1_dma_Buffer[i]);
+      }
+    }
+    else
+    {
+      for (uint16_t i = usart1_read_Index; i < BUF_SIZE; i++)
+      {
+        h_queue_push(usart1_dma_Buffer[i]);
+      }
+      for (uint16_t i = 0; i < usart1_new_write; i++)
+      {
+        h_queue_push(usart1_dma_Buffer[i]);
+      }
+    }
+    usart1_read_Index = usart1_new_write;        // 更新读指针
   }
 }
 /* USER CODE END 1 */

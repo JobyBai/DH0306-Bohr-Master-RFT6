@@ -1057,6 +1057,10 @@ void NotifyMenu(uint16_t screen_id, uint16_t control_id, uint8_t item,
 			damping_num = item + 1;
 			SendDampingCoefficient(damping_num);
 			SetTextInt32(3, 8, damping_num, 0, 1);
+			//关闭数据采集
+			measure_flag = 0;
+			collect_flag = 0;
+			SetButtonValue(2, 4, 0);
 			break;
 		}
 	}

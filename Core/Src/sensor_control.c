@@ -184,6 +184,7 @@ void Process_Frame() {
 			damped_record_buf[index_mode2 - 1].phase_diff2 = 0.0f;
 			// biaoge_bottom(2,1,index_mode2);// 展示对应行数
 			index_mode2++;
+			// 需要上传当前保存的数据到服务器
 		}
 	} else if (page_flag == 3) { // 当电机不转动的时候，也会显示周期和幅值
 		SetTextFloat(0x03, 0x0C, period, 4, 1);
