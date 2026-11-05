@@ -7,6 +7,9 @@
 #include "esp32.h"
 #include "vofa.h"
 #include "drv_can.h"
+#include "hmi_control.h"
+#include "string.h"
+#include "stdio.h"
 
 
 typedef struct H_QUEUE {
@@ -137,33 +140,122 @@ uint16_t collect_frequency = 1000;// 采集频率
 uint8_t collect_flag = 0; // 采集标志 0:关闭 1:开启
 
 
+
+
 // 处理上位机发送指令
 void host_data_deal(uint8_t *data, uint16_t len) {
-    if(data[2] != 0x20) return;
-	switch (data[3]) {
-	case 0x07:  // 开启双数据传输
-		// 开始数据采集前，先通知采集模块初始化
-    	DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER, 8);
-		HAL_Delay(100);
-		//通知采集模块开始发送数据
-		DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_ADC_ENCODER, 8);
-		// 设置采集频率
-		uint16_t fre = data[4] << 8 | data[5];
-        if (fre < 1 || fre > 1000) {
-            fre = 1000;
-        }
-		collect_frequency = 1000 / fre; // 设置采集频率
-		collect_flag = 1;
-		break;
-	case 0x08:  // 关闭双数据传输
-		//通知采集模块停止发送数据
-		DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_CLOSE_ADC_ENCODER, 8);
-		collect_flag = 0;
-		collect_frequency = 0;
-		break;
-	default:
-		break;
+	if(data[2] == 0x20){ // 上位机相关通讯
+		switch (data[3]) {
+		case 0x07:  // 开启双数据传输
+			{
+				// 开始数据采集前，先通知采集模块初始化
+				DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER, 8);
+				HAL_Delay(100);
+				//通知采集模块开始发送数据
+				DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_ADC_ENCODER, 8);
+				// 设置采集频率
+				uint16_t fre = data[4] << 8 | data[5];
+				if (fre < 1 || fre > 1000) {
+					fre = 1000;
+				}
+				collect_frequency = 1000 / fre; // 设置采集频率
+				collect_flag = 1;
+				break;
+			}
+		case 0x08:  // 关闭双数据传输
+			{
+				//通知采集模块停止发送数据
+				DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_CLOSE_ADC_ENCODER, 8);
+				collect_flag = 0;
+				collect_frequency = 0;
+				break;
+			}
+		default:
+			break;
+		}
 	}
+    else if(data[2] == 0x02 && data[3] == 0xF4) // AI服务数据查询
+    {
+    	DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_VOLTAGE, 8);// 获取电压数据
+        // 数据格式:	帧头（2字节 EE BE）+功能码（2字节02 F4）	数据长度（1字节 N）	数据（N字节）	校验和（1字节,通过sum_low_8bits获得）
+        // 数据部分： 实验界面类型(uint8_t,1-自由振荡 2-阻尼振荡 3-受迫振荡)，磁角度传感器电压值（float）,采集状态(uint8_t, 0-未开始采集 1正在采集)，阻尼档位（uint8_t,1-低档 2-中档 3-高档),电机状态(uint8_t,0:停止，1启动) -----ASCII 字符串逗号分割
+        // sensor_voltage 传感器电压值
+        // damping_num 阻尼档位
+        // current_screen 当前屏幕 1:自由振荡 2:阻尼振荡 3:受迫振荡
+        // 采集状态  measure_flag 0:未开始采集 1:正在采集
+        // 电机状态 motor_state 0:停止 1:启动
+        // 校验范围：帧头 ~ 数据末尾（不含校验和本身）
+        static uint8_t ai_msg[48]; // DMA发送期间缓冲区必须保持有效，故声明为static
+        int ai_data_len;
+        uint8_t screen_type;
+
+        if (huart1.gState != HAL_UART_STATE_READY)
+            return; // 上一次DMA尚未发完，丢弃本帧，避免覆写正在发送的缓冲区
+
+        // current_screen 还会被置为 0x000E(电压页)/0x0000，非 1~3 时归为 0（未知界面）
+        screen_type = (current_screen >= 1 && current_screen <= 3) ? (uint8_t) current_screen : 0;
+
+        ai_msg[0] = 0xEE; // 帧头1
+        ai_msg[1] = 0xBE; // 帧头2
+        ai_msg[2] = 0x02; // 功能码高字节
+        ai_msg[3] = 0xF4; // 功能码低字节
+
+        // 数据部分：实验界面类型,传感器电压值,采集状态,阻尼档位,电机状态（ASCII逗号分割）
+        // measure_flag 实际为 0:停止 1:自由 2:阻尼 3:受迫，按协议统一归一为 0/1
+        ai_data_len = snprintf((char*) &ai_msg[5], sizeof(ai_msg) - 6,
+                "%u,%.3f,%u,%u,%u",
+                (unsigned int) screen_type,
+                sensor_voltage,
+                (unsigned int) (measure_flag != 0 ? 1 : 0),
+                (unsigned int) damping_num,
+                (unsigned int) motor_state);
+
+        if (ai_data_len < 0) {
+            ai_data_len = 0;
+        } else if (ai_data_len > (int) (sizeof(ai_msg) - 6)) {
+            ai_data_len = (int) (sizeof(ai_msg) - 6); // 截断保护，防止N字段溢出
+        }
+
+        ai_msg[4] = (uint8_t) ai_data_len; // 数据长度 N
+        ai_msg[5 + ai_data_len] = sum_low_8bits(ai_msg, 5 + ai_data_len); // 校验和：帧头~数据末尾低8位累加
+        HAL_UART_Transmit_DMA(&huart1, ai_msg, 6 + ai_data_len); // 向AI网关发送数据
+    }
+    else if(data[2] == 0x00 && data[3] == 0x00) // AI服务设备信息查询
+    {
+        // 数据格式:	帧头（2字节 EE BE）+功能码（2字节00 00）	数据长度（1字节 N）	数据（N字节）	校验和（1字节,通过sum_low_8bits获得）
+        // 数据部分：设备编号\r\n设备型号（MP009）\r\n设备名称（DH-MP009）\r\n固件版本(V1.0.0)  （UTF-8编码格式）
+        // 校验范围：帧头 ~ 数据末尾（不含校验和本身）
+        static uint8_t ai_msg[96]; // DMA发送期间缓冲区必须保持有效，故声明为static
+        int ai_data_len;
+        uint8_t id_len = device_id_len;
+
+        if (huart1.gState != HAL_UART_STATE_READY)
+            return; // 上一次DMA尚未发完，丢弃本帧，避免覆写正在发送的缓冲区
+
+        // device_id 不保证以'\0'结尾，用长度限定输出，防止越界读取
+        if (id_len > DEVICE_ID_MAX_LEN)
+            id_len = DEVICE_ID_MAX_LEN;
+
+        ai_msg[0] = 0xEE; // 帧头1
+        ai_msg[1] = 0xBE; // 帧头2
+        ai_msg[2] = 0x00; // 功能码高字节
+        ai_msg[3] = 0x00; // 功能码低字节
+
+        // 数据部分：设备编号\r\n设备型号\r\n设备名称\r\n固件版本
+        ai_data_len = snprintf((char*) &ai_msg[5], sizeof(ai_msg) - 6,
+                "%.*s\r\nMP009\r\nDH-MP009\r\nV1.0.0",
+                (int) id_len, (char*) device_id);
+
+        if (ai_data_len < 0) {
+            ai_data_len = 0;
+        } else if (ai_data_len > (int) (sizeof(ai_msg) - 6)) {
+            ai_data_len = (int) (sizeof(ai_msg) - 6); // 截断保护，防止N字段溢出
+        }
+
+        ai_msg[4] = (uint8_t) ai_data_len; // 数据长度 N
+        ai_msg[5 + ai_data_len] = sum_low_8bits(ai_msg, 5 + ai_data_len); // 校验和：帧头~数据末尾低8位累加
+        HAL_UART_Transmit_DMA(&huart1, ai_msg, 6 + ai_data_len); // 向AI网关发送数据
+    }
 }
 
 void host_communication_task_callback(void) {

@@ -58,6 +58,11 @@ uint8_t motor_open_msg[6] = { 0xAA, 0x14, 0x00, 0x00, 0x00, 0x55 };  // 电机�
 uint8_t motor_close_msg[6] = { 0xAA, 0x15, 0x00, 0x00, 0x00, 0x55 }; // 电机关闭
 uint8_t jog_msg[6] = { 0xAA, 0x1A, 0x00, 0x00, 0x00, 0x55 };         // 点动
 
+//AI网关指令
+uint8_t ai_free_osc_clear_msg[7] = { 0xEE, 0xBE, 0x02, 0xF3, 0x01, 0x01, 0xA3 }; // 清除自由振荡数据表
+uint8_t ai_damped_osc_clear_msg[7] = { 0xEE, 0xBE, 0x02, 0xF3, 0x01, 0x02, 0xA4 }; // 清除阻尼振荡数据表
+uint8_t ai_forced_osc_clear_msg[7] = { 0xEE, 0xBE, 0x02, 0xF3, 0x01, 0x03, 0xA5 }; // 清除受迫振荡数据表
+
 // 阻尼1系数
 uint16_t damping1 = 1;
 // 阻尼2系数
@@ -85,6 +90,7 @@ uint32_t last_local_index  = 0;   // 新增：当前档位下已展示的行数
 const float step_table[] = { 0.001f, 0.01f, 0.1f, 1.0f };
 uint8_t step_index = 0;     // 默认 0.001
 float motor_cycle = 1.250f; // 电机周期 s
+uint8_t motor_state = 0; // 电机状态 0:停止 1:启动
 
 int8_t line_flag = -1;      // 选中行数
 uint8_t index_filtered = 0; // 筛选结果数量
@@ -277,6 +283,13 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 	if (screen_id == 0x0001) // 自由振荡
 			{
 		switch (control_id) {
+		case 0x02: // 返回首页
+			if (state == 0x01) {
+				//关闭数据测量
+				measure_flag = 0;
+				SetButtonValue(1, 3, 0);
+				return;
+			}
 		case 0x03: // 测量
 			if (state == 0x01) {
 				measure_flag = 1;
@@ -289,6 +302,8 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				index_mode1 = 1;
 				memset(free_record_buf, 0, sizeof(free_record_buf));
 				Record_Clear(1, 1);
+				// AI网关指令，发送清除自由振荡数据表指令
+				HAL_UART_Transmit_DMA(&huart1, ai_free_osc_clear_msg, 7);
 			}
 			break;
 
@@ -331,6 +346,14 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				measure_flag = 0;
 			}
 			break;
+		case 0x02: // 返回首页
+			if (state == 0x01) {
+				//关闭数据测量
+				measure_flag = 0;
+				SetButtonValue(2, 4, 0);
+				return;
+			}
+			break;
 		// case 0x03: // 清空所有
 		// 	if (state == 0x01) {
 		// 		index_mode2 = 1;
@@ -368,6 +391,9 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 
 				// 主动刷新一次表格（此时当前档位应该已经没有数据了）
 				FilterByDampedNum(damping_num);
+
+				// AI网关指令，发送清除阻尼振荡数据表指令
+				HAL_UART_Transmit_DMA(&huart1, ai_damped_osc_clear_msg, 7);
 			}
 			break;
 
@@ -402,6 +428,9 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 //				Sensor_Control_Start_Mode1();
 				// 切换继电器位置：恒流源
 				HAL_UART_Transmit_DMA(&huart4, current_msg, 6);
+				//关闭数据测量
+				measure_flag = 0;
+				SetButtonValue(2, 4, 0);
 			}
 		}
 		case 0x0D: // 角度调整弹窗
@@ -433,8 +462,10 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				// 启动受迫震荡前，先通知采集模块初始化
     			DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER, 8);
 				HAL_UART_Transmit_DMA(&huart4, motor_open_msg, 6);
+				motor_state = 1;
 			} else if (state == 0x00) {
 				HAL_UART_Transmit_DMA(&huart4, motor_close_msg, 6);
+				motor_state = 0;
 			}
 			break;
 		case 0x02: // 返回
@@ -442,6 +473,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				// 关闭电机
 				SetButtonValue(3, 1, 0);
 				HAL_UART_Transmit_DMA(&huart4, motor_close_msg, 6);
+				motor_state = 0;
 			}
 			break;
 		case 0x03: // 速度+
@@ -503,6 +535,8 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				forced_record_buf[index_mode3 - 1].damping = damping_num;
 				forced_record_buf[index_mode3 - 1].phase_diff1 = phase_diff1;
 				forced_record_buf[index_mode3 - 1].phase_diff2 = phase_diff2;
+
+				AI_Report_Record(&forced_record_buf[index_mode3 - 1],AI_FUNC_FORCED); // 上报AI网关（02 F2）
 				index_mode3++;
 			}
 			break;
@@ -518,6 +552,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				SetButtonValue(3, 1, 0);
 				HAL_UART_Transmit_DMA(&huart4, motor_close_msg, 6);
 				current_screen = 0x0003;
+				motor_state = 0;
 			}
 			break;
 		default:
@@ -577,7 +612,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				SetTextInt32(3, 0x0A, index_mode3 - 1, 0, 1); // 显示实际记录数
 			}
 			break;
-		case 0x03:
+		case 0x03:// 清空
 			if (state == 0x01) {
 				line_flag = -1;
 				index_mode3 = 1; // 重置回初始值1，而不是0
@@ -586,6 +621,9 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				memset(filtered_record_buf, 0, sizeof(filtered_record_buf));
 				Record_Clear(5, 1);
 				SetTextInt32(3, 0x0A, 0, 0, 1); // 显示记录数为0
+
+				// AI网关指令，发送清除受迫振荡数据表指令
+				HAL_UART_Transmit_DMA(&huart1, ai_forced_osc_clear_msg, 7);
 			}
 			break;
 		case 0x04:

@@ -12,28 +12,6 @@
 #include <string.h>
 #include <stdio.h>
 
-// // 引脚定义
-// #define A2_PORT GPIOC
-// #define A2_PIN GPIO_PIN_8
-
-// #define A1_PORT GPIOB
-// #define A1_PIN GPIO_PIN_14
-
-// // 宏封装
-// #define A2_HIGH()  HAL_GPIO_WritePin(A2_PORT,A2_PIN,GPIO_PIN_SET)
-// #define A2_LOW()   HAL_GPIO_WritePin(A2_PORT,A2_PIN,GPIO_PIN_RESET)
-
-// #define A1_HIGH()  HAL_GPIO_WritePin(A1_PORT,A1_PIN,GPIO_PIN_SET)
-// #define A1_LOW()   HAL_GPIO_WritePin(A1_PORT,A1_PIN,GPIO_PIN_RESET)
-
-// /* ───── 帧定义 ───── */
-// #define SENSOR_FRAME_HEADER     0xEE
-// #define SENSOR_MODE1_ID         0xBE
-// #define SENSOR_MODE2_ID         0xBB
-// #define SENSOR_FRAME_LEN        10      // 单帧总字节数
-
-// /* ───── DMA 环形缓冲区 ───── */
-// #define SENSOR_DMA_BUF_SIZE     256     // 必须是2的幂，方便取模
 
 #define     CAN_ID_MASTER            0x00A       // 主机id
 #define     CAN_ID_SLAVE             0x00B       // 从机id
@@ -48,6 +26,7 @@ extern uint16_t index_mode3;
 // extern uint8_t sensor_frame_len;// 单帧总字节数
 extern uint8_t page_flag;       // 页面标志位
 extern uint8_t measure_flag;    // 测量标志位// 0:停止测量，1：自由振荡测量，2：阻尼振荡测量，3：强迫振荡测量
+extern float sensor_voltage; // 磁角度传感器电压值
 
 
 extern float period;      // 周期
@@ -91,20 +70,26 @@ typedef struct
     uint16_t encoder_value; // 编码器值
 } ADC_Encoder_t;
 
+// ... existing code ...
 extern ADC_Encoder_t adc_encoder_buf[ADC_ENCODER_BUF_SIZE]; // ADC值与编码器值环形队列
 extern uint16_t adc_encoder_index;                          // 环形队列写指针
 
-/* ───── 接口函数 ───── */
-// void Sensor_Control_Init(void);
-// void Sensor_Control_Stop(void);
-// void Sensor_Control_Start_Mode1(void);
+/* ───── AI网关上报协议 ───── */
+// 帧格式：帧头(2B EE BE) + 功能码(2B 02 Fx) + 数据长度(1B N) + 数据(NB, ASCII逗号分割) + 校验和(1B)
+#define AI_FRAME_HDR0     0xEE   // 帧头1
+#define AI_FRAME_HDR1     0xBE   // 帧头2
+#define AI_FUNC_HIGH      0x02   // 功能码高字节
+#define AI_FUNC_FREE      0xF0   // 功能码低字节：自由振荡
+#define AI_FUNC_DAMPED    0xF1   // 功能码低字节：阻尼振荡
+#define AI_FUNC_FORCED    0xF2   // 功能码低字节：受迫振荡
+#define AI_MSG_BUF_SIZE   64     // 单帧发送缓冲区大小（含帧头与校验和）
 
-// void Sensor_Control_Start_Mode2(void);
-// void Sensor_Receive(void);
-// void Sensor_Poll(void);
+/* ───── 接口函数 ───── */
+// ... existing code ...
 void Control_Init(void);
 void Control_CanRxCallback(uint32_t ID, uint8_t *buf, uint8_t len);
 void Process_Frame(void);
+void AI_Report_Record(const Record_t *rec, uint8_t func_low); // 向AI网关上报一条测量记录
 
 
 

@@ -7,6 +7,7 @@
 #include <string.h>
 #include "hmi_control.h"
 #include "drv_can.h"
+#include "esp32.h"
 
 // CAN发送
 uint8_t CAN_SLAVE_ANSWER[8] = { 0x00, 0x20 }; // 从机应答指令
@@ -45,87 +46,8 @@ ADC_Encoder_t adc_encoder_buf[ADC_ENCODER_BUF_SIZE]; // ADC值与编码器值环
 uint16_t adc_encoder_index = 0;                      // 环形队列写指针
 
 
-float voltage = 0.0f; // 磁角度传感器电压值
+float sensor_voltage = 0.0f; // 磁角度传感器电压值
 
-// void Sensor_Control_Init(void) {
-// 	Sensor_Control_Stop();
-// 	read_pos = 0;
-// 	HAL_SPI_Receive_DMA(&hspi2, dma_buf, SENSOR_DMA_BUF_SIZE);
-// }
-
-// // 停止模式
-// void Sensor_Control_Stop(void) {
-// 	A2_LOW();
-// 	A1_LOW();
-// 	HAL_Delay(10);
-// }
-
-// // 启动模式1
-// void Sensor_Control_Start_Mode1(void) {
-// 	sensor_frame_len = 10;
-// 	Sensor_Control_Stop();
-// 	A2_LOW();
-// 	A1_HIGH();
-// }
-
-// // 启动模式2
-// void Sensor_Control_Start_Mode2(void) {
-// 	sensor_frame_len = 18;
-// 	Sensor_Control_Stop();
-// 	A2_HIGH();
-// 	A1_LOW();
-// }
-
-// /* ───── 私有：获取 DMA 当前写入位置 ───── */
-// /**
-//  * @brief 通过 DMA 剩余计数反推当前写到了哪个位置
-//  *        写指针 = 总长度 - DMA剩余未传数量
-//  */
-// static inline uint16_t get_dma_write_pos(void) {
-// 	return (uint16_t) (SENSOR_DMA_BUF_SIZE - __HAL_DMA_GET_COUNTER(hspi2.hdmarx));
-// }
-
-// /* ───── 私有：从环形缓冲区取一帧 ───── */
-// /**
-//  * @brief 在 read_pos 到 write_pos 之间搜索完整帧
-//  *        找到帧头后校验剩余长度是否足够，足够则解析并移动读指针
-//  * @return true  成功解析一帧
-//  *         false 没有完整帧
-//  */
-// static bool fetch_frame(uint8_t *frame_out) {
-// 	uint16_t write_pos = get_dma_write_pos();
-
-// 	/* 计算环形缓冲区中待处理字节数 */
-// 	uint16_t available = (write_pos - read_pos + SENSOR_DMA_BUF_SIZE)
-// 			% SENSOR_DMA_BUF_SIZE;
-
-// 	if (available < sensor_frame_len)
-// 		return false; // 数据不足一帧，等下次
-
-// 	/* 在待处理区域内搜索帧头 */
-// 	for (uint16_t i = 0; i < available; i++) {
-// 		uint16_t idx = (read_pos + i) % SENSOR_DMA_BUF_SIZE;
-
-// 		if (dma_buf[idx] != SENSOR_FRAME_HEADER)
-// 			continue;
-
-// 		/* 找到帧头，检查后续字节是否够一整帧 */
-// 		if (available - i < sensor_frame_len)
-// 			break; // 帧头之后数据不足，等下次 DMA 继续填充
-
-// 		/* 拷贝完整帧到线性缓冲区（处理环形回绕） */
-// 		for (uint16_t j = 0; j < sensor_frame_len; j++)
-// 			frame_out[j] = dma_buf[(idx + j) % SENSOR_DMA_BUF_SIZE];
-
-// 		/* 移动读指针到帧尾之后 */
-// 		read_pos = (idx + sensor_frame_len) % SENSOR_DMA_BUF_SIZE;
-// 		return true;
-// 	}
-
-// 	/* 没找到有效帧头，跳过这段脏数据，读指针追上写指针 */
-// 	read_pos = write_pos;
-// 	return false;
-// }
 
 /* ───── 解析并记录一帧 ───── */
 void Process_Frame() {
@@ -156,8 +78,9 @@ void Process_Frame() {
 			free_record_buf[index_mode1 - 1].damping = 0; // 无阻尼振荡
 			free_record_buf[index_mode1 - 1].phase_diff1 = 0.0f;
 			free_record_buf[index_mode1 - 1].phase_diff2 = 0.0f;
-			biaoge_bottom(1, 1, index_mode1); // 展示对应行数
-			index_mode1++;
+            biaoge_bottom(1, 1, index_mode1); // 展示对应行数
+			AI_Report_Record(&free_record_buf[index_mode1 - 1], AI_FUNC_FREE); // 上报AI网关（02 F0）
+            index_mode1++;
 		}
 	} else if (page_flag == 2) {
 
@@ -180,11 +103,11 @@ void Process_Frame() {
 			damped_record_buf[index_mode2 - 1].period = period;
 			damped_record_buf[index_mode2 - 1].drive_period = 0.0f;
 			damped_record_buf[index_mode2 - 1].damping = damping_num; // 阻尼档位
-			damped_record_buf[index_mode2 - 1].phase_diff1 = 0.0f;
-			damped_record_buf[index_mode2 - 1].phase_diff2 = 0.0f;
-			// biaoge_bottom(2,1,index_mode2);// 展示对应行数
-			index_mode2++;
-			// 需要上传当前保存的数据到服务器
+            damped_record_buf[index_mode2 - 1].phase_diff1 = 0.0f;
+            damped_record_buf[index_mode2 - 1].phase_diff2 = 0.0f;
+            // biaoge_bottom(2,1,index_mode2);// 展示对应行数
+           	AI_Report_Record(&damped_record_buf[index_mode2 - 1], AI_FUNC_DAMPED); // 上报AI网关（02 F1）
+            index_mode2++; // 序号已上报完成后再自增，保证与本条记录一致
 		}
 	} else if (page_flag == 3) { // 当电机不转动的时候，也会显示周期和幅值
 		SetTextFloat(0x03, 0x0C, period, 4, 1);
@@ -196,19 +119,6 @@ void Process_Frame() {
 
 /* ───── 公开函数 ───── */
 
-// void Sensor_Init(void) {
-// 	read_pos = 0;
-// 	HAL_SPI_Receive_DMA(&hspi2, dma_buf, SENSOR_DMA_BUF_SIZE);
-// }
-
-// void Sensor_Poll(void) {
-// 	uint8_t frame[sensor_frame_len];
-
-// 	/* 一次 Poll 尽可能消费所有完整帧 */
-// 	while (fetch_frame(frame)) {
-// 		// process_frame(frame);
-// 	}
-// }
 
 void Control_Init(void) {
 	DRV_RegisterCanRxCallback(Control_CanRxCallback); // 注册CAN接收处理回调函数
@@ -252,8 +162,8 @@ void Control_CanRxCallback(uint32_t ID, uint8_t *buf, uint8_t len) {
         adc_encoder_index = (adc_encoder_index + 1) % ADC_ENCODER_BUF_SIZE;
         break;
 	case 0x28: // 获取电压值
-		memcpy(&voltage, &buf[2], sizeof(float));
-		SetTextFloat(0x000E, 0x03, voltage, 3, 1);
+		memcpy(&sensor_voltage, &buf[2], sizeof(float));
+		SetTextFloat(0x000E, 0x03, sensor_voltage, 3, 1);
 		break;
 	case 0x29: // 设置电压值
 		SetScreen(0x000F);// 弹窗提示成功
@@ -263,3 +173,65 @@ void Control_CanRxCallback(uint32_t ID, uint8_t *buf, uint8_t len) {
 	}
 }
 
+
+
+/* ───── AI网关数据上报 ───── */
+/**
+ * @brief  按统一协议向AI网关上报一条测量记录
+ *         帧格式：帧头(EE BE) + 功能码(02 Fx) + 数据长度(1B N) + 数据(NB) + 校验和(1B)
+ *         数据部分为ASCII字符串、逗号分割，三种模式共用前缀"序号,振幅,摆盘周期"：
+ *           AI_FUNC_FREE  (02 F0)：序号,振幅,摆盘周期
+ *           AI_FUNC_DAMPED(02 F1)：序号,振幅,摆盘周期,阻尼档位
+ *           AI_FUNC_FORCED(02 F2)：序号,振幅,摆盘周期,阻尼档位,驱动周期,相位差1,相位差2
+ *         校验范围：帧头 ~ 数据末尾（不含校验和本身）
+ * @param  rec      已填充好的记录（各模式对应的 xxx_record_buf 元素）
+ * @param  func_low 功能码低字节，取 AI_FUNC_FREE / AI_FUNC_DAMPED / AI_FUNC_FORCED
+ */
+void AI_Report_Record(const Record_t *rec, uint8_t func_low) {
+    // DMA发送期间缓冲区必须保持有效，故声明为static（三个调用点均在main loop中顺序执行，无重入）
+    static uint8_t ai_msg[AI_MSG_BUF_SIZE];
+    int ai_data_len;
+
+    if (rec == NULL)
+        return;
+
+    if (huart1.gState != HAL_UART_STATE_READY)
+        return; // 上一次DMA尚未发完，丢弃本帧，避免覆写正在发送的缓冲区
+
+    ai_msg[0] = AI_FRAME_HDR0; // 帧头1
+    ai_msg[1] = AI_FRAME_HDR1; // 帧头2
+    ai_msg[2] = AI_FUNC_HIGH;  // 功能码高字节
+    ai_msg[3] = func_low;      // 功能码低字节
+
+    // 数据部分：ASCII逗号分割，预留5字节头部 + 1字节校验
+    switch (func_low) {
+    case AI_FUNC_FREE: // 序号,振幅,摆盘周期
+        ai_data_len = snprintf((char*) &ai_msg[5], sizeof(ai_msg) - 6,
+                "%u,%.1f,%.4f", (unsigned int) rec->index, rec->amplitude,
+                rec->period);
+        break;
+    case AI_FUNC_DAMPED: // 序号,振幅,摆盘周期,阻尼档位
+        ai_data_len = snprintf((char*) &ai_msg[5], sizeof(ai_msg) - 6,
+                "%u,%.1f,%.4f,%u", (unsigned int) rec->index, rec->amplitude,
+                rec->period, (unsigned int) rec->damping);
+        break;
+    case AI_FUNC_FORCED: // 序号,振幅,摆盘周期,阻尼档位,驱动周期,相位差1,相位差2
+        ai_data_len = snprintf((char*) &ai_msg[5], sizeof(ai_msg) - 6,
+                "%u,%.1f,%.4f,%u,%.4f,%.1f,%.1f", (unsigned int) rec->index,
+                rec->amplitude, rec->period, (unsigned int) rec->damping,
+                rec->drive_period, rec->phase_diff1, rec->phase_diff2);
+        break;
+    default:
+        return; // 未知功能码，不发送
+    }
+
+    if (ai_data_len < 0) {
+        ai_data_len = 0;
+    } else if (ai_data_len > (int) (sizeof(ai_msg) - 6)) {
+        ai_data_len = (int) (sizeof(ai_msg) - 6); // 截断保护，防止N字段溢出
+    }
+
+    ai_msg[4] = (uint8_t) ai_data_len; // 数据长度 N
+    ai_msg[5 + ai_data_len] = sum_low_8bits(ai_msg, 5 + ai_data_len); // 校验和：帧头~数据末尾低8位累加
+    HAL_UART_Transmit_DMA(&huart1, ai_msg, 6 + ai_data_len); // 向AI网关发送数据
+}
