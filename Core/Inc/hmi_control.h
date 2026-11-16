@@ -13,7 +13,7 @@
 #include "tim.h"
 #include "usart.h"
 
-extern uint8_t device_version;//设备版本 0-未设置 1-普通版本 2-AI版本 3-网络版本
+extern uint8_t device_version;//设备版本 0-未设置 1-普通版本 2-AI版本 3-网络版本 4-网络旧版（兼容老wifi协议）
 #define DEVICE_ID_MAX_LEN 32
 extern uint8_t device_id[DEVICE_ID_MAX_LEN];//设备ID
 extern uint8_t device_id_len;//设备ID实际长度

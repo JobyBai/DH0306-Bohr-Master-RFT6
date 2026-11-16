@@ -173,7 +173,8 @@ y_qsize y_queue_find_cmd2(y_qdata *buffer, y_qsize buf_len)
 
 void ESP32_ack_data(uint8_t *p ,uint16_t len)
 {
-	HAL_UART_Transmit(&huart2, p, len, 100);
+	/* 与老项目一致，整表发送需要超过 100 ms。 */
+	HAL_UART_Transmit(&huart2, p, len, 1000);
 }
 
 
@@ -245,7 +246,7 @@ void ESP32_232_data_tx(uint8_t *data,uint16_t len)
         	if(data[2]==wifi_state)wifi_state_flag=1;
             if(data[2]==wifi_connect_state_set){// 获取wifi连接状态
                 wifi_connect_state = data[4];				
-             }
+            }
             if(data[2]==wifi_signal_strength_set){// 获取wifi信号强弱
                 wifi_connect_state = data[4];	
                 if (data[4] == 2) // 连接状态下处理信号强弱
@@ -275,15 +276,15 @@ void ESP32_232_data_tx(uint8_t *data,uint16_t len)
             if(data[2]==ble_paring_set)memcpy(ble_paring,&data[4],data[3]);
         }
         
-	}else if(data[len-1]==0x13){// 处理wifi上传指令
-         WifiUpload_Process(data, sizeof(data));
+	}else if(data[len-1]==0x13 && device_version != 0x04){// 新版wifi上传指令
+         WifiUpload_Process(data, len);
    }
 }
 
 
 uint8_t ble_msg_receive_OK[]={0x6F,0x6B,0x0D,0x0A,0x12};//蓝牙发送成功
 uint8_t ble_msg_receive_ERROR[]={0x65,0x72,0x72,0x6F,0x72,0x0D,0x0A,0x12};//蓝牙发送失败
-// uint8_t wifi_msg_receive_OK[]={0x6F,0x6B,0x0D,0x0A,0x13};//wifi发送成功
+uint8_t wifi_msg_receive_OK[]={0x6F,0x6B,0x0D,0x0A,0x13};//旧版wifi发送成功
 // uint8_t wifi_msg_receive_ERROR[]={0x65,0x72,0x72,0x6F,0x72,0x0D,0x0A,0x13};//wifi发送失败
  void ESP32_232_communication_task_callback(void)
  {
@@ -299,10 +300,11 @@ uint8_t ble_msg_receive_ERROR[]={0x65,0x72,0x72,0x6F,0x72,0x0D,0x0A,0x12};//蓝�
             if(memcmp(uart2_rx_data,ble_msg_receive_OK,5) == 0){// 蓝牙发送成功
                  BleUpload_OnAck(1);
             }
-            // else if(memcmp(uart2_rx_data,wifi_msg_receive_OK,5) == 0){// wifi发送成功
-            //     //  SetScreen(0x000B);// 展示wifi发送成功
-            //     WifiUpload_OnAck(1);
-            // }
+            else if(device_version == 0x04 && wifi_transfer_type != 0
+                    && memcmp(uart2_rx_data,wifi_msg_receive_OK,5) == 0){// 旧版整表上传成功
+                WifiUpload_ChannelClose();
+                SetScreen(0x000B); // 提示发送成功
+            }
             else if(memcmp(uart2_rx_data,ble_msg_receive_ERROR,8) == 0){// 蓝牙发送失败
                 BleUpload_OnAck(0);
             }

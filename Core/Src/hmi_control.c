@@ -18,10 +18,11 @@
 #include "string.h"
 #include "usart.h"
 #include "wifi_upload.h"
+#include "wifi_upload_old.h"
 #include "host_control.h"
 #include "drv_can.h"
 
-uint8_t device_version = 0; // 设备版本 0-未设置 1-普通版本 2-AI版本 3-网络版本
+uint8_t device_version = 0; // 设备版本 0-未设置 1-普通版本 2-AI版本 3-网络版本 4-网络旧版（兼容老wifi协议）
 
 uint8_t device_id[DEVICE_ID_MAX_LEN] = {
     0x42, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36
@@ -233,6 +234,43 @@ void UpdateUI() {
 	}
 }
 
+/* 三个表格共用上传入口；旧版直接发送整表，新版沿用握手及逐行上传。 */
+static void StartWifiTableUpload(WifiUploadMode_t mode)
+{
+	if (device_version != 0x04) {
+		wifi_transfer_type = mode;
+		Wifi_Start_TX();
+		return;
+	}
+	if (wifi_transfer_type != 0) {
+		return;
+	}
+
+	wifi_transfer_type = mode;
+	WifiUploadResult_t result = WIFI_UPLOAD_INVALID_PARAM;
+	SetScreen(0x0009);
+	switch (mode) {
+	case WIFI_MODE_FREE:
+		result = WifiUpload_Free(device_id, free_record_buf, index_mode1 - 1);
+		break;
+	case WIFI_MODE_DAMPED:
+		/* 旧协议一次上传全部三个档位，由模块按档位分组。 */
+		result = WifiUpload_Damped(device_id, damped_record_buf, index_mode2 - 1);
+		break;
+	case WIFI_MODE_FORCED:
+		result = WifiUpload_Forced(device_id, forced_record_buf, index_mode3 - 1,
+				filter_damping_num);
+		break;
+	default:
+		break;
+	}
+
+	if (result != WIFI_UPLOAD_SUBMITTED) {
+		WifiUpload_ChannelClose();
+		SetScreen(0x000D);
+	}
+}
+
 /*!
  *  \brief  按钮控件通知
  *  \details  获取按钮状态变化(通过GetControlValue)时执行此函数
@@ -318,8 +356,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 						SetScreen(0x0008);
 						return;
 					}
-					wifi_transfer_type = 1;	
-					Wifi_Start_TX();
+					StartWifiTableUpload(WIFI_MODE_FREE);
 				} else if (connect_type == 0x07) // 蓝牙上传
 					{
 					ble_transfer_cancel = 1;
@@ -412,8 +449,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 						SetScreen(0x0008);
 						return;
 					}
-					wifi_transfer_type = 2;	
-					Wifi_Start_TX();
+					StartWifiTableUpload(WIFI_MODE_DAMPED);
 				} else if (connect_type == 0x07) // 蓝牙上传
 						{
 					ble_transfer_cancel = 1;
@@ -634,7 +670,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		case 0x04:
 			if (state == 0x01) {
 				if(collect_flag == 1) return; // 采集数据时不能上传
-				uint8_t count = index_mode3 - 1; // 实际记录数
+				uint16_t count = index_mode3 - 1; // 实际记录数
 				if (count > 81)
 					return;
 				current_screen = 0x0005;
@@ -649,8 +685,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 						SetScreen(0x0008);
 						return;
 					}
-					wifi_transfer_type = 3;	
-					Wifi_Start_TX();
+					StartWifiTableUpload(WIFI_MODE_FORCED);
 				} else if (connect_type == 0x07) {//蓝牙上传
 					ble_transfer_cancel = 1;
 					BleUpload_Start(BLE_MODE_FORCED);
@@ -954,7 +989,20 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 			break;
 		case 0x06: // 设置成网络版本
 			if (state == 0x01) {
+				WifiUpload_ChannelClose(); // 切换协议时清除上一次上传状态
 				device_version = 0x03;
+				sfud_erase_write(g_flash, FLASH_DEVICE_VERSION_ADDR,
+						sizeof(device_version), &device_version);
+				SetTextValue(0, 8, (unsigned char *)" ");
+				SetControlEnable(6, 1, 1);// wifi启用
+				// 开启wifi配置
+				Open_Wifi_Config();
+			}
+			break;
+		case 0x07: // 设置成老网络版本
+			if (state == 0x01) {
+				WifiUpload_ChannelClose(); // 切换协议时清除上一次上传状态
+				device_version = 0x04;
 				sfud_erase_write(g_flash, FLASH_DEVICE_VERSION_ADDR,
 						sizeof(device_version), &device_version);
 				SetTextValue(0, 8, (unsigned char *)" ");
@@ -1206,10 +1254,10 @@ void touch_hmi_task_callback(void) {
  *  \brief  获取flash数据
  */
 void GetFlashData(void) {
-	// 读取设备版本 0-未设置 1-普通版本 2-AI版本 3-网络版本
+	// 读取设备版本 0-未设置 1-普通版本 2-AI版本 3-网络版本 4-网络旧版
 	sfud_read(g_flash, FLASH_DEVICE_VERSION_ADDR, sizeof(device_version),
 			&device_version);
-	if (device_version == 0x01 || device_version == 0x02 || device_version == 0x03) {
+	if (device_version >= 0x01 && device_version <= 0x04) {
 		SetTextValue(0, 8, (unsigned char *)" ");
 		SetButtonValue(0x000E, device_version + 3, 1);
 	} else {
