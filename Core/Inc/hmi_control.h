@@ -29,8 +29,7 @@ extern uint8_t wifi_transfer_type;// wifi传输类型, 0不允许传输 1自由�
 
 // 蓝牙参数
 extern uint8_t ble_name[60];
-extern uint8_t ble_mac[60];
-extern uint8_t ble_paring[60];
+extern uint8_t ble_connect_state;      // 蓝牙连接状态 0:蓝牙关闭，1:广播态，2:已连接
 extern uint8_t ble_transfer_cancel;// 取消蓝牙传输, 1允许传输 2不允许传输
 
 

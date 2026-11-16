@@ -272,8 +272,9 @@ void ESP32_232_data_tx(uint8_t *data,uint16_t len)
                 }
             }
             if(data[2]==ble_name_set)memcpy(ble_name,&data[4],data[3]);
-            if(data[2]==ble_mac_set)memcpy(ble_mac,&data[4],data[3]);
-            if(data[2]==ble_paring_set)memcpy(ble_paring,&data[4],data[3]);
+            if(data[2]==ble_connect_state_get){
+                ble_connect_state = data[4];
+            };
         }
         
 	}else if(data[len-1]==0x13 && device_version != 0x04){// 新版wifi上传指令

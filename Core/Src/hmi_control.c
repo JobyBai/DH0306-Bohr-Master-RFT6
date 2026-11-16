@@ -34,15 +34,14 @@ uint8_t wlan_password[60] = { 0 };     // wifi 密码
 uint8_t wlan_service_IP[60] = { 0 };   // 服务端IP
 uint8_t wlan_service_port[60] = { 0 }; // 服务端端口
 uint8_t wifi_state_t[2] = { 0, 1 };    // wifi状态 0-未连接 1-已连接
-uint8_t protocol_type[2] = { 0, 1 };   // TCP-1    UDP-0;
+uint8_t protocol_type[2] = { 0, 1 };   // UDP-1    TCP-0;
 uint8_t wifi_connect_state = 0;      // wifi连接状态 0:禁用 ，1:打开未连接， 2：连接成功 3：连接中
 uint8_t wifi_transfer_type = 0; // wifi传输类型, 0不允许传输 1自由振荡上传 2阻尼振荡上传 3受迫振荡上传
 
 // 蓝牙 相关参数
 uint8_t ble_state_t[2] = { 0, 1 }; // 蓝牙状态 0-未连接 1-已连接
 uint8_t ble_name[60] = { 0 };      // 蓝牙名称
-uint8_t ble_mac[60] = { 0 };       // 蓝牙MAC
-uint8_t ble_paring[60] = { 0 };    // 蓝牙配对码
+uint8_t ble_connect_state = 0;      // 蓝牙连接状态 0:蓝牙关闭，1:广播态，2:已连接
 uint8_t ble_transfer_cancel = 0; // 取消蓝牙传输, 1允许传输 2不允许传输
 
 // power命令集
@@ -226,8 +225,6 @@ void UpdateUI() {
 	SetTextFloat(3, 0x0B, motor_cycle, 3, 1);
 	// 蓝牙参数
 	SetTextValue(7, 3, ble_name);
-	SetTextValue(7, 4, ble_mac);
-	SetTextValue(7, 5, ble_paring);
 	if (current_screen == 0x000E) {
 		// 获取电压值
 		DRV_CAN_SendData(CAN_ID_MASTER, CAN_SLAVE_ANSWER_VOLTAGE, 8);
@@ -1015,6 +1012,18 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 			break;
 		}
 	}
+	if(screen_id == 0x0010) // 蓝牙未连接提示
+	{
+		switch (control_id) {
+		case 0x02: // 确认
+			if (state == 0x01) {
+				SetScreen(current_screen);
+			}
+			break;
+		default:
+			break;
+		}
+	}
 }
 
 // 文本输入
@@ -1084,17 +1093,6 @@ void NotifyText(uint16_t screen_id, uint16_t control_id, const char *str) {
 			stm32_to_esp32_data(ble_name_set, ble_name, strlen(str),
 					esp32_stm32);
 			break;
-		case 0x04: // MAC
-			memset(ble_mac, 0, sizeof(ble_mac));
-			memcpy(ble_mac, str, strlen(str));
-			stm32_to_esp32_data(ble_mac_set, ble_mac, strlen(str), esp32_stm32);
-			break;
-		case 0x05: // 配对码
-			memset(ble_paring, 0, sizeof(ble_paring));
-			memcpy(ble_paring, str, strlen(str));
-			stm32_to_esp32_data(ble_paring_set, ble_paring, strlen(str),
-					esp32_stm32);
-			break;
 		default:
 			break;
 		}
@@ -1162,6 +1160,23 @@ void NotifyMenu(uint16_t screen_id, uint16_t control_id, uint8_t item,
 			filter_damping_num = item;
 			// 筛选
 			FilterData(item);
+		}
+			break;
+		}
+	}
+	if (screen_id == 0x0004) { // wifi协议选择
+		switch (control_id) {
+		case 0x09: // 只能TCP
+		{
+			if (item == 0x00) { //TCP
+				stm32_to_esp32_data(wifi_protocol, (uint8_t*) &protocol_type[1],
+						1, esp32_stm32);
+			}
+			// else { //UDP
+			// 	stm32_to_esp32_data(wifi_protocol, (uint8_t*) &protocol_type[0],
+			// 			1, esp32_stm32);
+			// }
+			break;
 		}
 			break;
 		}

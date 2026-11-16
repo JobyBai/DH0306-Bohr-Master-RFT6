@@ -344,6 +344,11 @@ static void send_current_row(void)
 
 void BleUpload_Start(BleUploadMode_t mode)
 {
+    // 检查蓝牙是否已连接
+    if(ble_connect_state != 2){
+        SetScreen(0x0010);// 展示正在蓝牙传输页面
+        return;
+    }
     if (s_tx.state == BLE_UPLOAD_SENDING) {
         printf("BleUpload: 上传正在进行中，忽略重复启动\r\n");
         return;

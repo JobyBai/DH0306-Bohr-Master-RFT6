@@ -42,9 +42,7 @@ typedef enum
 	ble_state=0xDF,
 	ble_name_set=0xDD,
 	ble_data_write=0xDC,
-	ble_mac_set=0xDB,
-	ble_paring_set=0xDA,
-	ble_connect_state=0xD0,//0:蓝牙关闭，1:未连接，2:已连接
+	ble_connect_state_get=0xD0,//0:蓝牙关闭，1:广播态，2:已连接
 
 	rs232_bond_set=0xCD,
 	re232_check_bit=0xCC,
