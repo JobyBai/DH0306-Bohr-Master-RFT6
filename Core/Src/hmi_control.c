@@ -92,7 +92,7 @@ uint8_t step_index = 0;     // 默认 0.001
 float motor_cycle = 1.250f; // 电机周期 s
 uint8_t motor_state = 0; // 电机状态 0:停止 1:启动
 
-int8_t line_flag = -1;      // 选中行数
+int8_t line_flag = -1;      // 选中行下标从0开始，-1表示未选中
 uint8_t index_filtered = 0; // 筛选结果数量
 uint8_t damping_index_filtered = 0; // 阻尼筛选结果数量
 
@@ -425,6 +425,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		{
 			if (state == 0x01) {
 				page_flag = 3;
+				current_screen = 0x0003;
 //				Sensor_Control_Start_Mode1();
 				// 切换继电器位置：恒流源
 				HAL_UART_Transmit_DMA(&huart4, current_msg, 6);
@@ -433,6 +434,7 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 				SetButtonValue(2, 4, 0);
 			}
 		}
+			break;
 		case 0x0D: // 角度调整弹窗
 			if (state == 0x01) {
 				current_screen = 0x0002;
@@ -578,37 +580,40 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 	if (screen_id == 0x0005) // 受迫表格页面
 			{
 		switch (control_id) {
-		case 0x02:
+		case 0x02:// 删除
 			if (state == 0x01) {
-				uint8_t count = index_mode3 - 1; // 实际记录数
-				if (count == 0 || line_flag > count || line_flag < 1) { // 注意：索引从1开始，所以 line_flag < 1
+				uint16_t count = index_mode3 - 1; // 实际记录数
+				if (count == 0 || line_flag >= count || line_flag < 0) {
 					line_flag = -1;
 					return;
 				}
-				Record_Delete(5, 1, line_flag);
 
-				for (uint8_t i = line_flag; i < count; i++) {
-					forced_record_buf[i] = forced_record_buf[i + 1];
-					forced_record_buf[i].index = i;
+				// 屏幕回传的行下标从0开始，筛选后需映射到原始数组下标。
+				uint16_t delete_index = count;
+				uint16_t visible_row = 0;
+				for (uint16_t i = 0; i < count; i++) {
+					if (filter_damping_num == 0
+							|| forced_record_buf[i].damping == filter_damping_num) {
+						if (visible_row == line_flag) {
+							delete_index = i;
+							break;
+						}
+						visible_row++;
+					}
 				}
-				memset(&forced_record_buf[count], 0, sizeof(Record_t));
-				line_flag = -1;
+				if (delete_index == count) {
+					line_flag = -1;
+					return;
+				}
+
+				for (uint16_t i = delete_index; i + 1 < count; i++) {
+					forced_record_buf[i] = forced_record_buf[i + 1];
+					forced_record_buf[i].index = i + 1;
+				}
+				memset(&forced_record_buf[count - 1], 0, sizeof(forced_record_buf[0]));
 				index_mode3--; // 记录数-1，等价于count变为count-1
 
-				Record_Clear(5, 1);
-				uint8_t new_count = index_mode3 - 1;
-				for (uint8_t i = 1; i <= new_count; i++) { // 从1开始遍历
-					snprintf((char*) output_str, sizeof(output_str),
-							"%lu;%.1f;%.4f;%.4f;%.1f;%.1f",
-							forced_record_buf[i].index,
-							forced_record_buf[i].amplitude,
-							forced_record_buf[i].drive_period,
-							forced_record_buf[i].period,
-							forced_record_buf[i].phase_diff1,
-							forced_record_buf[i].phase_diff2);
-					Record_Add(5, 1, output_str);
-				}
-
+				FilterData(filter_damping_num); // 按当前筛选条件从下标0重新显示
 				SetTextInt32(3, 0x0A, index_mode3 - 1, 0, 1); // 显示实际记录数
 			}
 			break;
@@ -1129,7 +1134,7 @@ void NotifySelector(uint16_t screen_id, uint16_t control_id, uint8_t item) {
  *  \brief  记录按钮点击通知
  *  \param screen_id 屏幕ID
  *  \param control_id 控件ID
- *  \param line 选中行
+ *  \param line 选中行下标，从0开始
  */
 void NotifyRecord(uint16_t screen_id, uint16_t control_id, uint8_t line) {
 	if (screen_id == 0x0005 && control_id == 0x01) { // 受迫振荡表格
@@ -1281,6 +1286,9 @@ void SendDampingCoefficient(uint8_t item) {
  *  \details  根据目标阻尼档位筛选数据，展示全部数据或指定阻尼档位的数据
  */
 void FilterData(uint8_t target_damping) {
+	filter_damping_num = target_damping;
+	line_flag = -1; // 表格重建后，原选中行已失效
+	index_filtered = 0;
 	// 展示全部数据
 	if (target_damping == 0) {
 		// 清空表格，重新填充筛选结果
@@ -1298,7 +1306,6 @@ void FilterData(uint8_t target_damping) {
 		return;
 	}
 	// 筛选
-	index_filtered = 0;
 	for (uint32_t i = 0; i < index_mode3 - 1; i++) {
 		if (forced_record_buf[i].damping == target_damping) {
 			filtered_record_buf[index_filtered] = forced_record_buf[i];
