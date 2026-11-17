@@ -282,7 +282,6 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		case 0x01: // 自由震荡
 			if (state == 0x01) {
 				page_flag = 1;
-//				Sensor_Control_Start_Mode1();
 				current_screen = 0x0001;
 				// 切换继电器位置：消磁
 				HAL_UART_Transmit_DMA(&huart4, demagnetize_msg, 6);
@@ -291,7 +290,6 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		case 0x02: // 阻尼振荡
 			if (state == 0x01) {
 				page_flag = 2;
-//				Sensor_Control_Start_Mode1();
 				current_screen = 0x0002;
 				// 切换继电器位置：恒流源
 				HAL_UART_Transmit_DMA(&huart4, current_msg, 6);
@@ -300,7 +298,6 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		case 0x03: // 受迫振荡
 			if (state == 0x01) {
 				page_flag = 3;
-//				Sensor_Control_Start_Mode1();
 				current_screen = 0x0003;
 				// 切换继电器位置：恒流源
 				HAL_UART_Transmit_DMA(&huart4, current_msg, 6);
@@ -334,6 +331,9 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 			break;
 		case 0x04: // 清空
 			if (state == 0x01) {
+				// 清空时需要先关闭测量，否则容易引起数据不一致
+				measure_flag = 0;
+				SetButtonValue(1, 3, 0);//自动关闭测量按钮
 				index_mode1 = 1;
 				memset(free_record_buf, 0, sizeof(free_record_buf));
 				Record_Clear(1, 1);
@@ -354,8 +354,9 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 						return;
 					}
 					StartWifiTableUpload(WIFI_MODE_FREE);
-				} else if (connect_type == 0x07) // 蓝牙上传
-					{
+				} 
+				else if (connect_type == 0x07) // 蓝牙上传
+				{
 					ble_transfer_cancel = 1;
 					BleUpload_Start(BLE_MODE_FREE); // 自由振荡
 				}
@@ -459,7 +460,6 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 			if (state == 0x01) {
 				page_flag = 3;
 				current_screen = 0x0003;
-//				Sensor_Control_Start_Mode1();
 				// 切换继电器位置：恒流源
 				HAL_UART_Transmit_DMA(&huart4, current_msg, 6);
 				//关闭数据测量
@@ -699,35 +699,12 @@ void NotifyButton(uint16_t screen_id, uint16_t control_id, uint8_t state) {
 		case 0x01:             // wifi开关
 			if (state == 0x01) { // 开启
 				Open_Wifi_Config();
-				// SetButtonValue(6, 2, 0);
-				// SetButtonValue(7, 1, 0);// 关闭蓝牙开关
-				// AnimationPlayFrame(0, 0x07, 0);
-				// AnimationPlayFrame(1, 0x08, 0);
-				// AnimationPlayFrame(2, 0x0C, 0);
-				// AnimationPlayFrame(5, 0x08, 0);
-				// // 设置连接方式为wifi
-				// connect_type = 0x04;
-				// sfud_erase_write(g_flash, FLASH_CONNECT_ADDR,
-				// 		sizeof(connect_type), &connect_type);
 			} else if (state == 0x00) {
-				// SetButtonValue(6, 1, 1);
 			}
 			break;
 		case 0x02:             // 蓝牙开关
 			if (state == 0x01) { // 开启
 				Open_Bluetooth_Config();
-				// SetButtonValue(6, 1, 0);
-				// SetButtonValue(4, 2, 0);// 关闭wifi开关
-				// AnimationPlayFrame(0, 0x07, 2);
-				// AnimationPlayFrame(1, 0x08, 1);
-				// AnimationPlayFrame(2, 0x0C, 1);
-				// AnimationPlayFrame(5, 0x08, 1);
-				// // 设置连接方式为蓝牙
-				// connect_type = 0x07;
-				// sfud_erase_write(g_flash, FLASH_CONNECT_ADDR,
-				// 		sizeof(connect_type), &connect_type);
-			} else if (state == 0x00) {
-				// SetButtonValue(6, 2, 1);
 			}
 			break;
 		case 0x07: // 阻尼1+
@@ -1275,6 +1252,15 @@ void GetFlashData(void) {
 	if (device_version >= 0x01 && device_version <= 0x04) {
 		SetTextValue(0, 8, (unsigned char *)" ");
 		SetButtonValue(0x000E, device_version + 3, 1);
+		if(device_version >= 0x03){// 只有网络版才能使用wifi通讯
+			SetControlEnable(6, 1, 1);// wifi启用
+			// 开启wifi配置
+			Open_Wifi_Config();
+		}else{
+			SetControlEnable(6, 1, 0);// wifi禁用
+			// 开启蓝牙配置
+			Open_Bluetooth_Config();
+		}
 	} else {
        SetTextValue(0, 8, (unsigned char *)"\xCE\xB4\xCD\xEA\xB3\xC9\xBC\xEC\xD1\xE9");
 	}
@@ -1396,35 +1382,6 @@ void FilterData(uint8_t target_damping) {
  *          仅在档位切换或有新数据入库时才实际刷新表格
  *  \param num 阻尼档位
  */
-// void FilterByDampedNum(uint8_t num) {
-//     if (current_screen != 0x0002) {
-//         return;
-//     }
-
-//     if (num == last_damping_num && index_mode2 == last_index_mode2) {
-//         return;
-//     }
-
-//     Record_Clear(2, 1);
-
-//     uint32_t local_index = 0;
-//     for (uint32_t i = 0; i < index_mode2 - 1; i++) {
-//         if (damped_record_buf[i].damping == num) {
-//             local_index++;
-//             snprintf((char *)output_str, sizeof(output_str), "%lu;%.1f;%.4f",
-//                      local_index, damped_record_buf[i].amplitude, damped_record_buf[i].period);
-//             Record_Add(2, 1, output_str);
-//         }
-//     }
-
-//     if (local_index > 0) {
-//         biaoge_bottom(2, 1, local_index - 1);
-//     }
-
-//     last_damping_num = num;
-//     last_index_mode2 = index_mode2;
-// }
-
 void FilterByDampedNum(uint8_t num) {
     if (current_screen != 0x0002) {
         return;

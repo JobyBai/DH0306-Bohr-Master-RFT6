@@ -235,6 +235,9 @@ static void send_current_row(void)
  */
 void WifiUpload_Start(WifiUploadMode_t mode)
 {
+    if(measure_flag != 0){// 测量过程中不支持上传
+        return;
+    }
     if (s_tx.state == WIFI_UPLOAD_SENDING) {
         printf("WifiUpload: 上传正在进行中，忽略重复启动\r\n");
         return;

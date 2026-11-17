@@ -346,7 +346,10 @@ void BleUpload_Start(BleUploadMode_t mode)
 {
     // 检查蓝牙是否已连接
     if(ble_connect_state != 2){
-        SetScreen(0x0010);// 展示正在蓝牙传输页面
+        SetScreen(0x0010);
+        return;
+    }
+    if(measure_flag != 0){// 测量过程中不支持上传
         return;
     }
     if (s_tx.state == BLE_UPLOAD_SENDING) {

@@ -139,8 +139,7 @@ int main(void)
 
   /*启动定时器4中断*/
   HAL_TIM_Base_Start_IT(&htim4);
-//   Sensor_Control_Init();
-//   Sensor_Control_Start_Mode1();
+
 
   //初始化电机周期
   HAL_UART_Transmit_DMA(&huart4, motor_cycle_msg, 6);
